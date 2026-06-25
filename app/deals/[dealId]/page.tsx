@@ -9,6 +9,11 @@ import { Badge, stageBadgeVariant } from '@/components/ui/Badge'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import Link from 'next/link'
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 interface Props {
   params: Promise<{ dealId: string }>
 }
@@ -42,11 +47,11 @@ export default async function DealDetailPage({ params }: Props) {
         <CardHeader><h2 className="font-semibold">案件情報</h2></CardHeader>
         <CardBody>
           <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div><dt className="text-gray-500">金額</dt><dd className="font-bold text-lg">¥{Number(deal.amount).toLocaleString()}</dd></div>
-            <div><dt className="text-gray-500">確度</dt><dd>{deal.probability}%</dd></div>
-            <div><dt className="text-gray-500">加重金額</dt><dd>¥{Math.round(Number(deal.amount) * deal.probability / 100).toLocaleString()}</dd></div>
-            <div><dt className="text-gray-500">クローズ予定日</dt><dd>{deal.expected_close_date?.toString().slice(0, 10) ?? '-'}</dd></div>
-            <div><dt className="text-gray-500">ステータス</dt><dd>{deal.status}</dd></div>
+            <div><dt className="text-gray-500">案件金額（円）</dt><dd className="font-bold text-lg">¥{Number(deal.amount).toLocaleString()}</dd><p className="text-xs text-gray-500">この案件で見込む受注金額</p></div>
+            <div><dt className="text-gray-500">受注確度（%）</dt><dd>{deal.probability}%</dd><p className="text-xs text-gray-500">案件が受注・成立する見込み度合い</p></div>
+            <div><dt className="text-gray-500">確度加重見込み金額（円）</dt><dd>¥{Math.round(Number(deal.amount) * deal.probability / 100).toLocaleString()}</dd><p className="text-xs text-gray-500">案件金額 × 受注確度</p></div>
+            <div><dt className="text-gray-500">受注予定日</dt><dd>{formatDate(deal.expected_close_date)}</dd><p className="text-xs text-gray-500">案件のクローズまたは受注を見込んでいる日付</p></div>
+            <div><dt className="text-gray-500">ステータス</dt><dd>{deal.status}</dd><p className="text-xs text-gray-500">案件の状態。進行中・受注・失注など</p></div>
             <div className="col-span-2"><dt className="text-gray-500">メモ</dt><dd className="whitespace-pre-wrap">{deal.memo ?? '-'}</dd></div>
           </dl>
         </CardBody>
@@ -67,7 +72,7 @@ export default async function DealDetailPage({ params }: Props) {
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mr-2">{a.type}</span>
                       <span className="text-sm">{a.summary}</span>
                     </div>
-                    <span className="text-xs text-gray-400">{a.activity_date?.toString().slice(0, 10)}</span>
+                    <span className="text-xs text-gray-400">{formatDate(a.activity_date)}</span>
                   </div>
                 </li>
               ))}
@@ -89,7 +94,7 @@ export default async function DealDetailPage({ params }: Props) {
                 return (
                   <li key={t.id} className={`px-6 py-3 flex items-center justify-between ${isOverdue ? 'bg-red-50' : ''}`}>
                     <span className={`text-sm ${isOverdue ? 'text-red-700 font-medium' : 'text-gray-900'} ${t.status === 'done' ? 'line-through text-gray-400' : ''}`}>{t.title}</span>
-                    <span className={`text-xs ${isOverdue ? 'text-red-600' : 'text-gray-400'}`}>{t.due_date?.toString().slice(0, 10) ?? ''}</span>
+                    <span className={`text-xs ${isOverdue ? 'text-red-600' : 'text-gray-400'}`}>{formatDate(t.due_date)}</span>
                   </li>
                 )
               })}
@@ -109,7 +114,7 @@ export default async function DealDetailPage({ params }: Props) {
               {files.map((f) => (
                 <li key={f.id} className="px-6 py-3 flex items-center justify-between">
                   <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">{f.filename}</a>
-                  <span className="text-xs text-gray-400">{f.created_at?.toString().slice(0, 10)}</span>
+                  <span className="text-xs text-gray-400">{formatDate(f.created_at)}</span>
                 </li>
               ))}
             </ul>

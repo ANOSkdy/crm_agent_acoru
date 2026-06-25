@@ -3,6 +3,11 @@ export const dynamic = 'force-dynamic'
 import { getFiles } from '@/lib/db/queries/files'
 import Link from 'next/link'
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 export default async function FilesPage() {
   const files = await getFiles()
 
@@ -38,7 +43,7 @@ export default async function FilesPage() {
                     ) : '-'}
                   </td>
                   <td className="px-6 py-3 text-gray-600">{f.file_type ?? f.mime_type ?? '-'}</td>
-                  <td className="px-6 py-3 text-gray-500">{f.created_at?.toString().slice(0, 10)}</td>
+                  <td className="px-6 py-3 text-gray-500">{formatDate(f.created_at)}</td>
                 </tr>
               ))
             )}

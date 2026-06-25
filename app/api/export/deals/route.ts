@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const deals = await getDeals()
 
-    const headers = ['ID', '案件名', '会社名', 'ステージ', '金額', '確度(%)', '加重金額', 'クローズ予定日', 'ステータス', '作成日']
+    const headers = ['ID', '案件名', '会社名', '営業ステージ', '案件金額（円）', '受注確度（%）', '確度加重見込み金額（円）', '受注予定日', 'ステータス', '作成日']
     const rows = deals.map((d) => {
       const amount = Number(d.amount)
       const weighted = Math.round(amount * d.probability / 100)

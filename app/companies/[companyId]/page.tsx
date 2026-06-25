@@ -19,6 +19,11 @@ import { deleteCompanyAction } from '@/lib/actions/companies'
 import { DeleteCompanyButton } from './DeleteCompanyButton'
 import Link from 'next/link'
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 interface Props {
   params: Promise<{ companyId: string }>
 }
@@ -149,7 +154,7 @@ export default async function CompanyDetailPage({ params }: Props) {
         <CardBody className="p-0">
           {deals.length > 0 && (
             <table className="w-full text-sm divide-y divide-gray-100">
-              <thead><tr className="bg-gray-50"><th className="px-6 py-2 text-left text-xs text-gray-500">案件名</th><th className="px-6 py-2 text-left text-xs text-gray-500">ステージ</th><th className="px-6 py-2 text-right text-xs text-gray-500">金額</th><th className="px-6 py-2 text-right text-xs text-gray-500">確度</th><th className="px-6 py-2 text-left text-xs text-gray-500">クローズ予定</th></tr></thead>
+              <thead><tr className="bg-gray-50"><th className="px-6 py-2 text-left text-xs text-gray-500">案件名</th><th className="px-6 py-2 text-left text-xs text-gray-500">営業ステージ</th><th className="px-6 py-2 text-right text-xs text-gray-500">案件金額（円）</th><th className="px-6 py-2 text-right text-xs text-gray-500">受注確度（%）</th><th className="px-6 py-2 text-left text-xs text-gray-500">受注予定日</th></tr></thead>
               <tbody className="divide-y divide-gray-100">
                 {deals.map((d) => (
                   <tr key={d.id} className="hover:bg-gray-50">
@@ -157,7 +162,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                     <td className="px-6 py-2"><Badge variant={stageBadgeVariant(d.stage_name)}>{d.stage_name ?? '-'}</Badge></td>
                     <td className="px-6 py-2 text-right">¥{Number(d.amount).toLocaleString()}</td>
                     <td className="px-6 py-2 text-right">{d.probability}%</td>
-                    <td className="px-6 py-2 text-gray-600">{d.expected_close_date?.toString().slice(0, 10) ?? '-'}</td>
+                    <td className="px-6 py-2 text-gray-600">{formatDate(d.expected_close_date)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -170,13 +175,13 @@ export default async function CompanyDetailPage({ params }: Props) {
                 <input type="hidden" name="company_id" value={companyId} />
                 <div className="grid grid-cols-2 gap-3">
                   <input name="title" placeholder="案件名 *" required className="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <input name="amount" type="number" placeholder="金額" defaultValue="0" className="px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <input name="probability" type="number" min="0" max="100" placeholder="確度(%)" defaultValue="0" className="px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <select name="stage_id" className="px-3 py-2 border border-gray-300 rounded text-sm">
-                    <option value="">ステージ</option>
+                  <label className="text-xs text-gray-500">案件金額（円）<input name="amount" type="number" placeholder="例: 100000" defaultValue="0" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded text-sm" /></label>
+                  <label className="text-xs text-gray-500">受注確度（%）<input name="probability" type="number" min="0" max="100" placeholder="例: 50" defaultValue="0" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded text-sm" /></label>
+                  <label className="text-xs text-gray-500">営業ステージ<select name="stage_id" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded text-sm">
+                    <option value="">営業ステージを選択</option>
                     {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                  <input name="expected_close_date" type="date" className="px-3 py-2 border border-gray-300 rounded text-sm" />
+                  </select></label>
+                  <label className="text-xs text-gray-500">受注予定日<input name="expected_close_date" type="date" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded text-sm" /></label>
                 </div>
                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">追加</button>
               </form>
@@ -200,7 +205,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                       {a.body && <p className="text-xs text-gray-500 mt-1">{a.body}</p>}
                       {a.next_action && <p className="text-xs text-blue-600 mt-1">次のアクション: {a.next_action}</p>}
                     </div>
-                    <span className="text-xs text-gray-400 whitespace-nowrap ml-4">{a.activity_date?.toString().slice(0, 10)}</span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap ml-4">{formatDate(a.activity_date)}</span>
                   </div>
                 </li>
               ))}
@@ -246,7 +251,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                         <span className={`text-sm font-medium ${t.status === 'done' ? 'line-through text-gray-400' : ''} ${isOverdue ? 'text-red-700' : 'text-gray-900'}`}>{t.title}</span>
                         <span className="ml-2 text-xs text-gray-500">[{priorityLabels[t.priority] ?? t.priority}]</span>
                       </div>
-                      <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{t.due_date?.toString().slice(0, 10) ?? ''}</span>
+                      <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{formatDate(t.due_date)}</span>
                     </div>
                   </li>
                 )
@@ -283,7 +288,7 @@ export default async function CompanyDetailPage({ params }: Props) {
               {files.map((f) => (
                 <li key={f.id} className="px-6 py-3 flex items-center justify-between">
                   <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">{f.filename}</a>
-                  <span className="text-xs text-gray-400">{f.created_at?.toString().slice(0, 10)}</span>
+                  <span className="text-xs text-gray-400">{formatDate(f.created_at)}</span>
                 </li>
               ))}
             </ul>

@@ -4,6 +4,11 @@ import { getDeals, getDealStages } from '@/lib/db/queries/deals'
 import { Badge, stageBadgeVariant } from '@/components/ui/Badge'
 import Link from 'next/link'
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 interface Props {
   searchParams: Promise<{ stageId?: string; status?: string }>
 }
@@ -46,10 +51,10 @@ export default async function DealsPage({ searchParams }: Props) {
       </form>
 
       {/* Totals */}
-      <div className="flex gap-6 text-sm">
-        <span className="text-gray-600">件数: <strong>{deals.length}</strong></span>
-        <span className="text-gray-600">合計金額: <strong>¥{totalAmount.toLocaleString()}</strong></span>
-        <span className="text-gray-600">加重合計: <strong>¥{weightedAmount.toLocaleString()}</strong></span>
+      <div className="flex flex-wrap gap-6 text-sm">
+        <div className="text-gray-600">案件件数: <strong>{deals.length}</strong><p className="text-xs text-gray-500">表示対象の案件数</p></div>
+        <div className="text-gray-600">案件金額合計（円）: <strong>¥{totalAmount.toLocaleString()}</strong><p className="text-xs text-gray-500">表示対象案件の金額を単純合計した金額</p></div>
+        <div className="text-gray-600">確度加重見込み金額（円）: <strong>¥{weightedAmount.toLocaleString()}</strong><p className="text-xs text-gray-500">確度加重見込み金額 = 案件金額 × 受注確度</p></div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -58,10 +63,10 @@ export default async function DealsPage({ searchParams }: Props) {
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">案件名</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">会社</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">ステージ</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">金額</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">確度</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">クローズ予定</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">営業ステージ</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">案件金額（円）</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">受注確度（%）</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">受注予定日</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -79,7 +84,7 @@ export default async function DealsPage({ searchParams }: Props) {
                   <td className="px-6 py-3"><Badge variant={stageBadgeVariant(d.stage_name)}>{d.stage_name ?? '-'}</Badge></td>
                   <td className="px-6 py-3 text-right">¥{Number(d.amount).toLocaleString()}</td>
                   <td className="px-6 py-3 text-right">{d.probability}%</td>
-                  <td className="px-6 py-3 text-gray-600">{d.expected_close_date?.toString().slice(0, 10) ?? '-'}</td>
+                  <td className="px-6 py-3 text-gray-600">{formatDate(d.expected_close_date)}</td>
                 </tr>
               ))
             )}

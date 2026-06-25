@@ -14,26 +14,30 @@ export default async function ReportsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardBody>
-            <p className="text-xs text-gray-500">今月クローズ予定</p>
+            <p className="text-xs text-gray-500">今月の受注予定金額（円）</p>
             <p className="text-xl font-bold text-gray-900">¥{Number(data.thisMonthClose).toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">今月に受注予定日がある案件金額の合計</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody>
-            <p className="text-xs text-gray-500">来月クローズ予定</p>
+            <p className="text-xs text-gray-500">来月の受注予定金額（円）</p>
             <p className="text-xl font-bold text-gray-900">¥{Number(data.nextMonthClose).toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">来月に受注予定日がある案件金額の合計</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody>
-            <p className="text-xs text-gray-500">加重フォーキャスト</p>
+            <p className="text-xs text-gray-500">確度加重売上見込み（円）</p>
             <p className="text-xl font-bold text-blue-600">¥{Number(data.weightedForecast).toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">案件金額に受注確度を掛けた売上見込み</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody>
-            <p className="text-xs text-gray-500">期限切れタスク</p>
+            <p className="text-xs text-gray-500">期限切れタスク数</p>
             <p className="text-xl font-bold text-red-600">{data.overdueTaskCount}</p>
+            <p className="text-xs text-gray-500 mt-1">期限日を過ぎた未完了タスクの件数</p>
           </CardBody>
         </Card>
       </div>
@@ -46,10 +50,10 @@ export default async function ReportsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="px-6 py-2 text-left text-xs text-gray-500">ステージ</th>
-                  <th className="px-6 py-2 text-right text-xs text-gray-500">件数</th>
-                  <th className="px-6 py-2 text-right text-xs text-gray-500">合計金額</th>
-                  <th className="px-6 py-2 text-right text-xs text-gray-500">加重金額</th>
+                  <th className="px-6 py-2 text-left text-xs text-gray-500">営業ステージ</th>
+                  <th className="px-6 py-2 text-right text-xs text-gray-500">案件件数</th>
+                  <th className="px-6 py-2 text-right text-xs text-gray-500">案件金額合計（円）</th>
+                  <th className="px-6 py-2 text-right text-xs text-gray-500">確度加重見込み金額（円）</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
