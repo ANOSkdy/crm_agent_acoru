@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/lib/utils/date'
 import { NextResponse } from 'next/server'
 import { getDeals } from '@/lib/db/queries/deals'
 
@@ -17,9 +18,9 @@ export async function GET() {
         amount,
         d.probability,
         weighted,
-        d.expected_close_date ?? '',
+        formatDisplayDate(d.expected_close_date),
         d.status,
-        d.created_at?.toString().slice(0, 10) ?? '',
+        formatDisplayDate(d.created_at),
       ]
     })
 

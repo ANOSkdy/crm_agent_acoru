@@ -10,19 +10,17 @@ import { getFilesByCompany } from '@/lib/db/queries/files'
 import { getAiSummaries } from '@/lib/db/queries/ai_summaries'
 import { Badge, stageBadgeVariant, statusBadgeVariant } from '@/components/ui/Badge'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
-import { createContactAction } from '@/lib/actions/contacts'
-import { createDealAction } from '@/lib/actions/deals'
-import { createActivityAction } from '@/lib/actions/activities'
-import { createTaskAction } from '@/lib/actions/tasks'
-import { createFileAction } from '@/lib/actions/files'
+import { createContactAction, deleteContactAction } from '@/lib/actions/contacts'
+import { createDealAction, deleteDealAction } from '@/lib/actions/deals'
+import { createActivityAction, deleteActivityAction } from '@/lib/actions/activities'
+import { createTaskAction, completeTaskAction, deleteTaskAction } from '@/lib/actions/tasks'
+import { createFileAction, deleteFileAction } from '@/lib/actions/files'
 import { deleteCompanyAction } from '@/lib/actions/companies'
 import { DeleteCompanyButton } from './DeleteCompanyButton'
 import Link from 'next/link'
+import { formatDisplayDate, formatDisplayDateTime } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 interface Props {
   params: Promise<{ companyId: string }>
@@ -111,7 +109,7 @@ export default async function CompanyDetailPage({ params }: Props) {
         <CardBody className="p-0">
           {contacts.length > 0 && (
             <table className="w-full text-sm divide-y divide-gray-100">
-              <thead><tr className="bg-gray-50"><th className="px-6 py-2 text-left text-xs text-gray-500">名前</th><th className="px-6 py-2 text-left text-xs text-gray-500">部署</th><th className="px-6 py-2 text-left text-xs text-gray-500">役職</th><th className="px-6 py-2 text-left text-xs text-gray-500">メール</th><th className="px-6 py-2 text-left text-xs text-gray-500">KDM</th></tr></thead>
+              <thead><tr className="bg-gray-50"><th className="px-6 py-2 text-left text-xs text-gray-500">名前</th><th className="px-6 py-2 text-left text-xs text-gray-500">部署</th><th className="px-6 py-2 text-left text-xs text-gray-500">役職</th><th className="px-6 py-2 text-left text-xs text-gray-500">メール</th><th className="px-6 py-2 text-left text-xs text-gray-500">KDM</th><th className="px-6 py-2 text-left text-xs text-gray-500">操作</th></tr></thead>
               <tbody className="divide-y divide-gray-100">
                 {contacts.map((c) => (
                   <tr key={c.id}>
@@ -119,7 +117,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                     <td className="px-6 py-2 text-gray-600">{c.department ?? '-'}</td>
                     <td className="px-6 py-2 text-gray-600">{c.position ?? '-'}</td>
                     <td className="px-6 py-2 text-gray-600">{c.email ?? '-'}</td>
-                    <td className="px-6 py-2">{c.is_decision_maker ? '✓' : ''}</td>
+                    <td className="px-6 py-2">{c.is_decision_maker ? '✓' : ''}</td><td className="px-6 py-2 whitespace-nowrap"><Link href={`/contacts/${c.id}/edit`} className="text-xs text-blue-600 hover:underline mr-2">編集</Link><form action={deleteContactAction.bind(null, c.id, companyId)} className="inline"><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></td>
                   </tr>
                 ))}
               </tbody>
@@ -154,7 +152,7 @@ export default async function CompanyDetailPage({ params }: Props) {
         <CardBody className="p-0">
           {deals.length > 0 && (
             <table className="w-full text-sm divide-y divide-gray-100">
-              <thead><tr className="bg-gray-50"><th className="px-6 py-2 text-left text-xs text-gray-500">案件名</th><th className="px-6 py-2 text-left text-xs text-gray-500">営業ステージ</th><th className="px-6 py-2 text-right text-xs text-gray-500">案件金額（円）</th><th className="px-6 py-2 text-right text-xs text-gray-500">受注確度（%）</th><th className="px-6 py-2 text-left text-xs text-gray-500">受注予定日</th></tr></thead>
+              <thead><tr className="bg-gray-50"><th className="px-6 py-2 text-left text-xs text-gray-500">案件名</th><th className="px-6 py-2 text-left text-xs text-gray-500">営業ステージ</th><th className="px-6 py-2 text-right text-xs text-gray-500">案件金額（円）</th><th className="px-6 py-2 text-right text-xs text-gray-500">受注確度（%）</th><th className="px-6 py-2 text-left text-xs text-gray-500">受注予定日</th><th className="px-6 py-2 text-left text-xs text-gray-500">操作</th></tr></thead>
               <tbody className="divide-y divide-gray-100">
                 {deals.map((d) => (
                   <tr key={d.id} className="hover:bg-gray-50">
@@ -162,7 +160,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                     <td className="px-6 py-2"><Badge variant={stageBadgeVariant(d.stage_name)}>{d.stage_name ?? '-'}</Badge></td>
                     <td className="px-6 py-2 text-right">¥{Number(d.amount).toLocaleString()}</td>
                     <td className="px-6 py-2 text-right">{d.probability}%</td>
-                    <td className="px-6 py-2 text-gray-600">{formatDate(d.expected_close_date)}</td>
+                    <td className="px-6 py-2 text-gray-600">{formatDate(d.expected_close_date)}</td><td className="px-6 py-2 whitespace-nowrap"><Link href={`/deals/${d.id}/edit`} className="text-xs text-blue-600 hover:underline mr-2">編集</Link><form action={deleteDealAction.bind(null, d.id, companyId)} className="inline"><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></td>
                   </tr>
                 ))}
               </tbody>
@@ -205,7 +203,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                       {a.body && <p className="text-xs text-gray-500 mt-1">{a.body}</p>}
                       {a.next_action && <p className="text-xs text-blue-600 mt-1">次のアクション: {a.next_action}</p>}
                     </div>
-                    <span className="text-xs text-gray-400 whitespace-nowrap ml-4">{formatDate(a.activity_date)}</span>
+                    <div className="flex items-center gap-2 whitespace-nowrap ml-4"><span className="text-xs text-gray-400">{formatDate(a.activity_date)}</span><Link href={`/activities/${a.id}/edit`} className="text-xs text-blue-600 hover:underline">編集</Link><form action={deleteActivityAction.bind(null, a.id, companyId)}><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></div>
                   </div>
                 </li>
               ))}
@@ -251,7 +249,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                         <span className={`text-sm font-medium ${t.status === 'done' ? 'line-through text-gray-400' : ''} ${isOverdue ? 'text-red-700' : 'text-gray-900'}`}>{t.title}</span>
                         <span className="ml-2 text-xs text-gray-500">[{priorityLabels[t.priority] ?? t.priority}]</span>
                       </div>
-                      <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{formatDate(t.due_date)}</span>
+                      <div className="flex items-center gap-2"><span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{formatDate(t.due_date)}</span>{t.status === 'open' && <form action={completeTaskAction.bind(null, t.id)}><button type="submit" className="text-xs text-green-600 hover:underline">完了</button></form>}<Link href={`/tasks/${t.id}/edit`} className="text-xs text-blue-600 hover:underline">編集</Link><form action={deleteTaskAction.bind(null, t.id, companyId)}><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></div>
                     </div>
                   </li>
                 )
@@ -288,7 +286,7 @@ export default async function CompanyDetailPage({ params }: Props) {
               {files.map((f) => (
                 <li key={f.id} className="px-6 py-3 flex items-center justify-between">
                   <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">{f.filename}</a>
-                  <span className="text-xs text-gray-400">{formatDate(f.created_at)}</span>
+                  <div className="flex items-center gap-2"><span className="text-xs text-gray-400">{formatDate(f.created_at)}</span><Link href={`/files/${f.id}/edit`} className="text-xs text-blue-600 hover:underline">編集</Link><form action={deleteFileAction.bind(null, f.id, companyId)}><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></div>
                 </li>
               ))}
             </ul>
@@ -336,7 +334,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                     <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
                       {s.summary_type === 'company_summary' ? '顧客サマリー' : 'ネクストアクション提案'}
                     </span>
-                    <span className="text-xs text-gray-400">{s.created_at?.toString().slice(0, 16)}</span>
+                    <span className="text-xs text-gray-400">{formatDisplayDateTime(s.created_at)}</span>
                   </div>
                   <p className="text-sm text-gray-800 whitespace-pre-wrap">{s.content}</p>
                 </li>

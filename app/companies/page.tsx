@@ -3,11 +3,9 @@ export const dynamic = 'force-dynamic'
 import { getCompanies } from '@/lib/db/queries/companies'
 import { Badge, statusBadgeVariant } from '@/components/ui/Badge'
 import Link from 'next/link'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 interface Props {
   searchParams: Promise<{ search?: string; status?: string }>

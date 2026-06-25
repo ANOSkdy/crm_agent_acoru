@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/lib/utils/date'
 import 'server-only'
 import { Company } from '@/lib/db/queries/companies'
 import { Deal } from '@/lib/db/queries/deals'
@@ -13,11 +14,11 @@ export async function suggestNextActions(
 
   const activitiesText = activities
     .slice(0, 5)
-    .map((a) => `- [${a.type}] ${a.activity_date?.toString().slice(0, 10)}: ${a.summary}`)
+    .map((a) => `- [${a.type}] ${formatDisplayDate(a.activity_date)}: ${a.summary}`)
     .join('\n')
 
   const dealText = deal
-    ? `案件名: ${deal.title}\n金額: ¥${Number(deal.amount).toLocaleString()}\nステージ: ${deal.stage_name ?? '未設定'}\n確度: ${deal.probability}%\nクローズ予定: ${deal.expected_close_date ?? '未設定'}`
+    ? `案件名: ${deal.title}\n金額: ¥${Number(deal.amount).toLocaleString()}\nステージ: ${deal.stage_name ?? '未設定'}\n確度: ${deal.probability}%\nクローズ予定: ${formatDisplayDate(deal.expected_close_date)}`
     : '案件情報なし'
 
   const prompt = `営業担当者として、以下の顧客・案件情報をもとに、次に取るべき具体的なアクションを3〜5個提案してください。

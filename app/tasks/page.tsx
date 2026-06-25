@@ -3,11 +3,9 @@ export const dynamic = 'force-dynamic'
 import { getTasks } from '@/lib/db/queries/tasks'
 import { completeTaskAction, deleteTaskAction } from '@/lib/actions/tasks'
 import Link from 'next/link'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 const priorityLabels: Record<string, string> = {
   high: '高',
@@ -71,12 +69,12 @@ export default async function TasksPage() {
                     </td>
                     <td className="px-6 py-3 text-gray-600">{t.status === 'done' ? '完了' : '未完'}</td>
                     <td className="px-6 py-3">
-                      {t.status === 'open' && (
+                      <Link href={`/tasks/${t.id}/edit`} className="text-xs text-blue-600 hover:underline mr-2">編集</Link>{t.status === 'open' && (
                         <form action={completeTaskAction.bind(null, t.id)} className="inline">
                           <button type="submit" className="text-xs text-green-600 hover:underline mr-2">完了</button>
                         </form>
                       )}
-                      <form action={deleteTaskAction.bind(null, t.id)} className="inline">
+                      <form action={deleteTaskAction.bind(null, t.id, undefined)} className="inline">
                         <button type="submit" className="text-xs text-red-500 hover:underline">削除</button>
                       </form>
                     </td>

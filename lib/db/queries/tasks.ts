@@ -21,6 +21,11 @@ export interface Task {
 
 type Row = Record<string, unknown>
 function toTask(r: Row): Task { return r as unknown as Task }
+function emptyToNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
 
 export async function getTasks(filters?: { companyId?: string; dealId?: string; status?: string }): Promise<Task[]> {
   const companyId = filters?.companyId ?? null
@@ -64,6 +69,15 @@ export async function getTasksByCompany(companyId: string): Promise<Task[]> {
   return getTasks({ companyId })
 }
 
+export async function getTaskById(id: string): Promise<Task | null> {
+  const rows = await sql`
+    SELECT t.*, co.name as company_name FROM tasks t
+    LEFT JOIN companies co ON co.id = t.company_id
+    WHERE t.id = ${id} AND t.deleted_at IS NULL
+  `
+  return rows[0] ? toTask(rows[0]) : null
+}
+
 export async function createTask(data: {
   company_id?: string
   deal_id?: string
@@ -86,6 +100,25 @@ export async function createTask(data: {
     RETURNING *
   `
   return toTask(rows[0])
+}
+
+export async function updateTask(id: string, data: { company_id?: string; deal_id?: string; title: string; description?: string; due_date?: string; priority: string; status?: string }): Promise<Task | null> {
+  const completedAt = data.status === 'done' ? new Date().toISOString() : null
+  const rows = await sql`
+    UPDATE tasks SET
+      company_id = ${emptyToNull(data.company_id)},
+      deal_id = ${emptyToNull(data.deal_id)},
+      title = ${data.title},
+      description = ${emptyToNull(data.description)},
+      due_date = ${emptyToNull(data.due_date)},
+      priority = ${data.priority},
+      status = ${data.status ?? 'open'},
+      completed_at = ${completedAt},
+      updated_at = now()
+    WHERE id = ${id} AND deleted_at IS NULL
+    RETURNING *
+  `
+  return rows[0] ? toTask(rows[0]) : null
 }
 
 export async function completeTask(id: string): Promise<void> {

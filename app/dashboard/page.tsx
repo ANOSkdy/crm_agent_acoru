@@ -3,11 +3,9 @@ export const dynamic = 'force-dynamic'
 import { getDashboardData } from '@/lib/db/queries/dashboard'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import Link from 'next/link'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 export default async function DashboardPage() {
   const data = await getDashboardData()

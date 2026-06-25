@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/lib/utils/date'
 import { NextResponse } from 'next/server'
 import { getCompanies } from '@/lib/db/queries/companies'
 
@@ -18,7 +19,7 @@ export async function GET() {
       c.status,
       c.source ?? '',
       (c.memo ?? '').replace(/,/g, '、').replace(/\n/g, ' '),
-      c.created_at?.toString().slice(0, 10) ?? '',
+      formatDisplayDate(c.created_at),
     ])
 
     const csv = [headers, ...rows]
