@@ -18,11 +18,9 @@ import { createFileAction, deleteFileAction } from '@/lib/actions/files'
 import { deleteCompanyAction } from '@/lib/actions/companies'
 import { DeleteCompanyButton } from './DeleteCompanyButton'
 import Link from 'next/link'
+import { formatDisplayDate, formatDisplayDateTime } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 interface Props {
   params: Promise<{ companyId: string }>
@@ -336,7 +334,7 @@ export default async function CompanyDetailPage({ params }: Props) {
                     <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
                       {s.summary_type === 'company_summary' ? '顧客サマリー' : 'ネクストアクション提案'}
                     </span>
-                    <span className="text-xs text-gray-400">{s.created_at?.toString().slice(0, 16)}</span>
+                    <span className="text-xs text-gray-400">{formatDisplayDateTime(s.created_at)}</span>
                   </div>
                   <p className="text-sm text-gray-800 whitespace-pre-wrap">{s.content}</p>
                 </li>

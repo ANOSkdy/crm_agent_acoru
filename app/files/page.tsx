@@ -3,11 +3,9 @@ export const dynamic = 'force-dynamic'
 import { getFiles } from '@/lib/db/queries/files'
 import Link from 'next/link'
 import { deleteFileAction } from '@/lib/actions/files'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 export default async function FilesPage() {
   const files = await getFiles()

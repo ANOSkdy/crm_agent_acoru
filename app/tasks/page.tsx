@@ -3,11 +3,9 @@ export const dynamic = 'force-dynamic'
 import { getTasks } from '@/lib/db/queries/tasks'
 import { completeTaskAction, deleteTaskAction } from '@/lib/actions/tasks'
 import Link from 'next/link'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 const priorityLabels: Record<string, string> = {
   high: '高',

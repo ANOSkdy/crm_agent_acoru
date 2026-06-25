@@ -3,11 +3,9 @@ export const dynamic = 'force-dynamic'
 import { getActivities } from '@/lib/db/queries/activities'
 import Link from 'next/link'
 import { deleteActivityAction } from '@/lib/actions/activities'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 const activityTypeLabels: Record<string, string> = {
   call: '電話',

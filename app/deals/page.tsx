@@ -4,11 +4,9 @@ import { getDeals, getDealStages } from '@/lib/db/queries/deals'
 import { Badge, stageBadgeVariant } from '@/components/ui/Badge'
 import Link from 'next/link'
 import { deleteDealAction } from '@/lib/actions/deals'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toISOString().slice(0, 10)
-}
+const formatDate = formatDisplayDate
 
 interface Props {
   searchParams: Promise<{ stageId?: string; status?: string }>

@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/lib/utils/date'
 import 'server-only'
 import { Company } from '@/lib/db/queries/companies'
 import { Activity } from '@/lib/db/queries/activities'
@@ -13,7 +14,7 @@ export async function summarizeCompany(
 
   const activitiesText = activities
     .slice(0, 10)
-    .map((a) => `- [${a.type}] ${a.activity_date?.toString().slice(0, 10)}: ${a.summary}`)
+    .map((a) => `- [${a.type}] ${formatDisplayDate(a.activity_date)}: ${a.summary}`)
     .join('\n')
 
   const dealsText = deals

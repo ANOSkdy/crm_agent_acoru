@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { toDateInputValue } from '@/lib/utils/date'
 import { getTaskById } from '@/lib/db/queries/tasks'
 import { getCompanies } from '@/lib/db/queries/companies'
 import { getDeals } from '@/lib/db/queries/deals'
@@ -25,7 +26,7 @@ export default async function EditPage({ params }: Props) {
         <input type="hidden" name="redirectTo" value={record.company_id ? `/companies/${record.company_id}` : '/tasks'} />
         <label className="block text-sm font-medium">タイトル *<input name="title" required defaultValue={record.title} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" /></label>
         <label className="block text-sm font-medium">説明<textarea name="description" rows={3} defaultValue={record.description ?? ''} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" /></label>
-        <label className="block text-sm font-medium">期限<input name="due_date" type="date" defaultValue={record.due_date?.slice(0, 10) ?? ''} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" /></label>
+        <label className="block text-sm font-medium">期限<input name="due_date" type="date" defaultValue={toDateInputValue(record.due_date)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" /></label>
         <label className="block text-sm font-medium">優先度<select name="priority" defaultValue={record.priority} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
         <label className="block text-sm font-medium">ステータス<select name="status" defaultValue={record.status} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"><option value="open">未完</option><option value="done">完了</option></select></label>
         <label className="block text-sm font-medium">会社<select name="company_id" defaultValue={record.company_id ?? ''} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"><option value="">未設定</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>

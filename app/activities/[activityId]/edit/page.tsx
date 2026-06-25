@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { toDateTimeLocalInputValue } from '@/lib/utils/date'
 import { getActivityById } from '@/lib/db/queries/activities'
 import { getContacts } from '@/lib/db/queries/contacts'
 import { getDeals } from '@/lib/db/queries/deals'
@@ -25,7 +26,7 @@ export default async function EditPage({ params }: Props) {
         <input type="hidden" name="redirectTo" value={`/companies/${record.company_id}`} />
         <input type="hidden" name="company_id" value={record.company_id} />
         <label className="block text-sm font-medium">種別<select name="type" defaultValue={record.type} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"><option value="call">電話</option><option value="email">メール</option><option value="meeting">ミーティング</option><option value="visit">訪問</option><option value="other">その他</option></select></label>
-        <label className="block text-sm font-medium">日時<input name="activity_date" type="datetime-local" required defaultValue={record.activity_date?.slice(0, 16)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" /></label>
+        <label className="block text-sm font-medium">日時<input name="activity_date" type="datetime-local" required defaultValue={toDateTimeLocalInputValue(record.activity_date)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" /></label>
         <label className="block text-sm font-medium">概要 *<input name="summary" required defaultValue={record.summary} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" /></label>
         <label className="block text-sm font-medium">担当者<select name="contact_id" defaultValue={record.contact_id ?? ''} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"><option value="">未設定</option>{contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <label className="block text-sm font-medium">案件<select name="deal_id" defaultValue={record.deal_id ?? ''} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"><option value="">未設定</option>{deals.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}</select></label>
