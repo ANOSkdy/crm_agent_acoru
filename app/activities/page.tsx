@@ -3,6 +3,11 @@ export const dynamic = 'force-dynamic'
 import { getActivities } from '@/lib/db/queries/activities'
 import Link from 'next/link'
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 const activityTypeLabels: Record<string, string> = {
   call: '電話',
   email: 'メール',
@@ -46,7 +51,7 @@ export default async function ActivitiesPage() {
                     </Link>
                   </td>
                   <td className="px-6 py-3 text-gray-600">{a.contact_name ?? '-'}</td>
-                  <td className="px-6 py-3 text-gray-500">{a.activity_date?.toString().slice(0, 10)}</td>
+                  <td className="px-6 py-3 text-gray-500">{formatDate(a.activity_date)}</td>
                 </tr>
               ))
             )}

@@ -4,6 +4,11 @@ import { getDashboardData } from '@/lib/db/queries/dashboard'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import Link from 'next/link'
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 export default async function DashboardPage() {
   const data = await getDashboardData()
 
@@ -55,7 +60,7 @@ export default async function DashboardPage() {
                         <p className="text-xs text-gray-500">{a.company_name} · {a.type}</p>
                       </div>
                       <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                        {a.activity_date?.toString().slice(0, 10)}
+                        {formatDate(a.activity_date)}
                       </span>
                     </div>
                   </li>
@@ -74,9 +79,9 @@ export default async function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left">
-                  <th className="px-6 py-2 text-xs font-medium text-gray-500">ステージ</th>
-                  <th className="px-6 py-2 text-xs font-medium text-gray-500 text-right">件数</th>
-                  <th className="px-6 py-2 text-xs font-medium text-gray-500 text-right">合計金額</th>
+                  <th className="px-6 py-2 text-xs font-medium text-gray-500">営業ステージ</th>
+                  <th className="px-6 py-2 text-xs font-medium text-gray-500 text-right">案件件数</th>
+                  <th className="px-6 py-2 text-xs font-medium text-gray-500 text-right">案件金額合計（円）</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

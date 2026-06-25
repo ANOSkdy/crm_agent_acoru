@@ -4,6 +4,11 @@ import { getTasks } from '@/lib/db/queries/tasks'
 import { completeTaskAction, deleteTaskAction } from '@/lib/actions/tasks'
 import Link from 'next/link'
 
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toISOString().slice(0, 10)
+}
+
 const priorityLabels: Record<string, string> = {
   high: '高',
   medium: '中',
@@ -61,7 +66,7 @@ export default async function TasksPage() {
                       </span>
                     </td>
                     <td className={`px-6 py-3 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                      {t.due_date?.toString().slice(0, 10) ?? '-'}
+                      {formatDate(t.due_date)}
                       {isOverdue && ' ⚠'}
                     </td>
                     <td className="px-6 py-3 text-gray-600">{t.status === 'done' ? '完了' : '未完'}</td>
