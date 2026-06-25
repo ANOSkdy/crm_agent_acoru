@@ -20,6 +20,11 @@ export interface Contact {
 
 type Row = Record<string, unknown>
 function toContact(r: Row): Contact { return r as unknown as Contact }
+function emptyToNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
 
 export async function getContacts(companyId?: string): Promise<Contact[]> {
   let rows: Row[]
@@ -91,13 +96,13 @@ export async function updateContact(
 ): Promise<Contact | null> {
   const rows = await sql`
     UPDATE contacts SET
-      name = COALESCE(${data.name ?? null}, name),
-      department = COALESCE(${data.department ?? null}, department),
-      position = COALESCE(${data.position ?? null}, position),
-      email = COALESCE(${data.email ?? null}, email),
-      phone = COALESCE(${data.phone ?? null}, phone),
-      is_decision_maker = COALESCE(${data.is_decision_maker ?? null}, is_decision_maker),
-      memo = COALESCE(${data.memo ?? null}, memo),
+      name = ${data.name},
+      department = ${emptyToNull(data.department)},
+      position = ${emptyToNull(data.position)},
+      email = ${emptyToNull(data.email)},
+      phone = ${emptyToNull(data.phone)},
+      is_decision_maker = ${data.is_decision_maker ?? false},
+      memo = ${emptyToNull(data.memo)},
       updated_at = now()
     WHERE id = ${id} AND deleted_at IS NULL
     RETURNING *

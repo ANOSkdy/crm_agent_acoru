@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { getDeals, getDealStages } from '@/lib/db/queries/deals'
 import { Badge, stageBadgeVariant } from '@/components/ui/Badge'
 import Link from 'next/link'
+import { deleteDealAction } from '@/lib/actions/deals'
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return '-'
@@ -66,12 +67,12 @@ export default async function DealsPage({ searchParams }: Props) {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">営業ステージ</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">案件金額（円）</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">受注確度（%）</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">受注予定日</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">受注予定日</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {deals.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-500">案件が見つかりません</td></tr>
+              <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">案件が見つかりません</td></tr>
             ) : (
               deals.map((d) => (
                 <tr key={d.id} className="hover:bg-gray-50">
@@ -84,7 +85,7 @@ export default async function DealsPage({ searchParams }: Props) {
                   <td className="px-6 py-3"><Badge variant={stageBadgeVariant(d.stage_name)}>{d.stage_name ?? '-'}</Badge></td>
                   <td className="px-6 py-3 text-right">¥{Number(d.amount).toLocaleString()}</td>
                   <td className="px-6 py-3 text-right">{d.probability}%</td>
-                  <td className="px-6 py-3 text-gray-600">{formatDate(d.expected_close_date)}</td>
+                  <td className="px-6 py-3 text-gray-600">{formatDate(d.expected_close_date)}</td><td className="px-6 py-3 whitespace-nowrap"><Link href={`/deals/${d.id}/edit`} className="text-xs text-blue-600 hover:underline mr-2">編集</Link><form action={deleteDealAction.bind(null, d.id, undefined)} className="inline"><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></td>
                 </tr>
               ))
             )}

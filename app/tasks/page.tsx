@@ -71,12 +71,12 @@ export default async function TasksPage() {
                     </td>
                     <td className="px-6 py-3 text-gray-600">{t.status === 'done' ? '完了' : '未完'}</td>
                     <td className="px-6 py-3">
-                      {t.status === 'open' && (
+                      <Link href={`/tasks/${t.id}/edit`} className="text-xs text-blue-600 hover:underline mr-2">編集</Link>{t.status === 'open' && (
                         <form action={completeTaskAction.bind(null, t.id)} className="inline">
                           <button type="submit" className="text-xs text-green-600 hover:underline mr-2">完了</button>
                         </form>
                       )}
-                      <form action={deleteTaskAction.bind(null, t.id)} className="inline">
+                      <form action={deleteTaskAction.bind(null, t.id, undefined)} className="inline">
                         <button type="submit" className="text-xs text-red-500 hover:underline">削除</button>
                       </form>
                     </td>
