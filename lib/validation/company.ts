@@ -1,16 +1,32 @@
 import { z } from 'zod'
 
+function emptyToNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+const optionalTextSchema = z.preprocess(emptyToNull, z.string().nullable())
+
+const optionalCorporateNumberSchema = z
+  .preprocess(emptyToNull, z.string().regex(/^[0-9]{13}$/, '法人番号は13桁の数字で入力してください').nullable())
+
+const optionalUrlSchema = z.preprocess(
+  emptyToNull,
+  z.string().url('URLの形式が正しくありません').nullable()
+)
+
 export const createCompanySchema = z.object({
   name: z.string().min(1, '会社名は必須です'),
-  corporate_number: z.string().optional(),
-  industry: z.string().optional(),
-  website_url: z.string().url('URLの形式が正しくありません').optional().or(z.literal('')),
-  postal_code: z.string().optional(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
+  corporate_number: optionalCorporateNumberSchema,
+  industry: optionalTextSchema,
+  website_url: optionalUrlSchema,
+  postal_code: optionalTextSchema,
+  address: optionalTextSchema,
+  phone: optionalTextSchema,
   status: z.enum(['active', 'inactive']).default('active'),
-  source: z.string().optional(),
-  memo: z.string().optional(),
+  source: optionalTextSchema,
+  memo: optionalTextSchema,
 })
 
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>

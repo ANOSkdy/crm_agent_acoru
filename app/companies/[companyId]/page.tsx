@@ -16,6 +16,7 @@ import { createActivityAction } from '@/lib/actions/activities'
 import { createTaskAction } from '@/lib/actions/tasks'
 import { createFileAction } from '@/lib/actions/files'
 import { deleteCompanyAction } from '@/lib/actions/companies'
+import { DeleteCompanyButton } from './DeleteCompanyButton'
 import Link from 'next/link'
 
 interface Props {
@@ -74,13 +75,7 @@ export default async function CompanyDetailPage({ params }: Props) {
             編集
           </Link>
           <form action={deleteAction}>
-            <button
-              type="submit"
-              className="px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
-              onClick={(e) => { if (!confirm('削除しますか？')) e.preventDefault() }}
-            >
-              削除
-            </button>
+            <DeleteCompanyButton />
           </form>
         </div>
       </div>
