@@ -14,7 +14,7 @@ export default function NewCompanyPage() {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">法人番号</label>
-          <input name="corporate_number" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input name="corporate_number" pattern="[0-9]{13}" title="法人番号は13桁の数字で入力してください" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">業種</label>
