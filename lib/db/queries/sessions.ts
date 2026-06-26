@@ -24,8 +24,8 @@ export async function createSession(
 
 export async function getActiveSessionByTokenHash(tokenHash: string): Promise<ActiveSession | null> {
   const rows = await sql`
-    SELECT s.id, s.user_id, s.expires_at,
-      u.id as user_id_value, u.name, u.email, u.role, COALESCE(u.is_active, true) as is_active
+    SELECT s.id as session_id, s.user_id as session_user_id, s.expires_at,
+      u.id as user_id, u.name, u.email, u.role, COALESCE(u.is_active, true) as is_active
     FROM user_sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ${tokenHash}
@@ -38,11 +38,11 @@ export async function getActiveSessionByTokenHash(tokenHash: string): Promise<Ac
   if (!row) return null
 
   return {
-    id: row.id as string,
-    user_id: row.user_id as string,
+    id: row.session_id as string,
+    user_id: row.session_user_id as string,
     expires_at: row.expires_at as Date | string,
     user: {
-      id: row.user_id_value as string,
+      id: row.user_id as string,
       name: row.name as string,
       email: row.email as string,
       role: row.role as string,

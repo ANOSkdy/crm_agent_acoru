@@ -6,7 +6,8 @@ import { createSession, getActiveSessionByTokenHash, revokeSessionByTokenHash, t
 import type { AppUser } from '@/lib/db/queries/users'
 
 export const SESSION_COOKIE_NAME = 'acoru_session'
-const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
+const SESSION_DURATION_MS = SESSION_MAX_AGE_SECONDS * 1000
 
 export function createSessionToken() {
   return randomBytes(32).toString('base64url')
@@ -16,13 +17,25 @@ export function hashSessionToken(token: string) {
   return createHash('sha256').update(token).digest('hex')
 }
 
-function getCookieOptions(expires: Date) {
+function getSessionCookieOptions(expires: Date) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
     path: '/',
     expires,
+    maxAge: SESSION_MAX_AGE_SECONDS,
+  }
+}
+
+function getExpiredCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/',
+    expires: new Date(0),
+    maxAge: 0,
   }
 }
 
@@ -60,7 +73,7 @@ export async function createUserSession(userId: string) {
   )
 
   const cookieStore = await cookies()
-  cookieStore.set(SESSION_COOKIE_NAME, token, getCookieOptions(expiresAt))
+  cookieStore.set(SESSION_COOKIE_NAME, token, getSessionCookieOptions(expiresAt))
 }
 
 export async function revokeCurrentSession() {
@@ -69,5 +82,5 @@ export async function revokeCurrentSession() {
   if (token) {
     await revokeSessionByTokenHash(hashSessionToken(token))
   }
-  cookieStore.set(SESSION_COOKIE_NAME, '', getCookieOptions(new Date(0)))
+  cookieStore.set(SESSION_COOKIE_NAME, '', getExpiredCookieOptions())
 }
