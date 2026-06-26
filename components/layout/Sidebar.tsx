@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { logoutAction } from '@/lib/actions/auth'
 
 const navItems = [
   { href: '/dashboard', label: 'ダッシュボード', icon: '📊' },
@@ -33,13 +34,15 @@ export function Sidebar() {
         </ul>
       </nav>
       <div className="border-t border-gray-700 p-4">
-        <Link
-          href="/logout"
-          className="flex items-center gap-3 rounded px-2 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
-        >
-          <span>🚪</span>
-          <span>ログアウト</span>
-        </Link>
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded px-2 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+          >
+            <span>🚪</span>
+            <span>ログアウト</span>
+          </button>
+        </form>
       </div>
     </aside>
   )

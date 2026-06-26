@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { sql } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
-import { createUserSession } from '@/lib/auth/session'
+import { createUserSession, getCurrentUser, revokeCurrentSession } from '@/lib/auth/session'
 import { getUserByLoginId, markLoginFailure, markLoginSuccess } from '@/lib/db/queries/users'
 import { LOGIN_ERROR_MESSAGE, LOCKED_ERROR_MESSAGE, loginSchema } from '@/lib/validation/auth'
 
@@ -61,4 +61,15 @@ export async function loginAction(
   await insertAuditLog('login_success', user.id)
 
   redirect('/dashboard')
+}
+
+export async function logoutAction() {
+  const user = await getCurrentUser()
+  await revokeCurrentSession()
+
+  if (user) {
+    await insertAuditLog('logout', user.id)
+  }
+
+  redirect('/login')
 }
