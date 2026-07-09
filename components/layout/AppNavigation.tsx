@@ -74,7 +74,8 @@ export function AppNavigation() {
       </ul>
       <div className="app-nav__footer">
         <form action={logoutAction}>
-          <button type="submit" className="app-nav__item app-header__logout" title={collapsed ? 'ログアウト' : undefined}>
+          <button type="submit" className="app-nav__item app-nav__logout" title={collapsed ? 'ログアウト' : undefined}>
+            <span className="app-nav__logout-icon" aria-hidden="true">↩</span>
             <span className="app-nav__item-label">ログアウト</span>
           </button>
         </form>
