@@ -131,3 +131,22 @@ export async function completeTask(id: string): Promise<void> {
 export async function deleteTask(id: string): Promise<void> {
   await sql`UPDATE tasks SET deleted_at = now() WHERE id = ${id}`
 }
+
+export async function updateTaskGridFields(id: string, data: Partial<Pick<Task, 'title' | 'due_date' | 'priority' | 'status'>>): Promise<Task | null> {
+  const before = await getTaskById(id)
+  if (!before) return null
+  const nextStatus = Object.hasOwn(data, 'status') ? data.status : before.status
+  const completedAt = nextStatus === 'done' ? (before.completed_at ?? new Date().toISOString()) : null
+  const rows = await sql`
+    UPDATE tasks SET
+      title = ${Object.hasOwn(data, 'title') ? data.title : before.title},
+      due_date = ${Object.hasOwn(data, 'due_date') ? data.due_date : before.due_date},
+      priority = ${Object.hasOwn(data, 'priority') ? data.priority : before.priority},
+      status = ${nextStatus},
+      completed_at = ${completedAt},
+      updated_at = now()
+    WHERE id = ${id} AND deleted_at IS NULL
+    RETURNING *
+  `
+  return rows[0] ? getTaskById(String(rows[0].id)) : null
+}

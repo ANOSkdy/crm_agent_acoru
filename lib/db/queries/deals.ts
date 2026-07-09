@@ -195,3 +195,20 @@ export async function deleteDeal(id: string): Promise<void> {
     VALUES ('delete', 'deal', ${id})
   `
 }
+
+export async function updateDealGridFields(id: string, data: Partial<Pick<Deal, 'title' | 'amount' | 'probability' | 'expected_close_date' | 'status'>>): Promise<Deal | null> {
+  const before = await getDealById(id)
+  if (!before) return null
+  const rows = await sql`
+    UPDATE deals SET
+      title = ${Object.hasOwn(data, 'title') ? data.title : before.title},
+      amount = ${Object.hasOwn(data, 'amount') ? data.amount : before.amount},
+      probability = ${Object.hasOwn(data, 'probability') ? data.probability : before.probability},
+      expected_close_date = ${Object.hasOwn(data, 'expected_close_date') ? data.expected_close_date : before.expected_close_date},
+      status = ${Object.hasOwn(data, 'status') ? data.status : before.status},
+      updated_at = now()
+    WHERE id = ${id} AND deleted_at IS NULL
+    RETURNING *
+  `
+  return rows[0] ? getDealById(String(rows[0].id)) : null
+}
