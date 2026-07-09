@@ -1,11 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { getCompanies } from '@/lib/db/queries/companies'
-import { Badge, statusBadgeVariant } from '@/components/ui/Badge'
 import Link from 'next/link'
-import { formatDisplayDate } from '@/lib/utils/date'
-
-const formatDate = formatDisplayDate
+import { CompaniesGrid } from '@/components/grid/CompaniesGrid'
 
 interface Props {
   searchParams: Promise<{ search?: string; status?: string }>
@@ -60,46 +57,8 @@ export default async function CompaniesPage({ searchParams }: Props) {
         </button>
       </form>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-left border-b border-gray-200">
-              <th className="px-6 py-3 text-xs font-medium text-gray-500">会社名</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500">業種</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500">電話番号</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500">ステータス</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500">作成日</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {companies.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                  顧客が見つかりません
-                </td>
-              </tr>
-            ) : (
-              companies.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3">
-                    <Link href={`/companies/${c.id}`} className="font-medium text-blue-600 hover:underline">
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td className="px-6 py-3 text-gray-700">{c.industry ?? '-'}</td>
-                  <td className="px-6 py-3 text-gray-700">{c.phone ?? '-'}</td>
-                  <td className="px-6 py-3">
-                    <Badge variant={statusBadgeVariant(c.status)}>
-                      {c.status === 'active' ? 'アクティブ' : '非アクティブ'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-3 text-gray-500">{formatDate(c.created_at)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <CompaniesGrid companies={companies} />
+
     </div>
   )
 }
