@@ -1,12 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { getDeals, getDealStages } from '@/lib/db/queries/deals'
-import { Badge, stageBadgeVariant } from '@/components/ui/Badge'
-import Link from 'next/link'
-import { deleteDealAction } from '@/lib/actions/deals'
-import { formatDisplayDate } from '@/lib/utils/date'
-
-const formatDate = formatDisplayDate
+import { DealsGrid } from '@/components/grid/DealsGrid'
 
 interface Props {
   searchParams: Promise<{ stageId?: string; status?: string }>
@@ -56,40 +51,8 @@ export default async function DealsPage({ searchParams }: Props) {
         <div className="text-gray-600">確度加重見込み金額（円）: <strong>¥{weightedAmount.toLocaleString()}</strong><p className="text-xs text-gray-500">確度加重見込み金額 = 案件金額 × 受注確度</p></div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">案件名</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">会社</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">営業ステージ</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">案件金額（円）</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">受注確度（%）</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">受注予定日</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {deals.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">案件が見つかりません</td></tr>
-            ) : (
-              deals.map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3">
-                    <Link href={`/deals/${d.id}`} className="font-medium text-blue-600 hover:underline">{d.title}</Link>
-                  </td>
-                  <td className="px-6 py-3">
-                    <Link href={`/companies/${d.company_id}`} className="text-gray-700 hover:underline">{d.company_name ?? '-'}</Link>
-                  </td>
-                  <td className="px-6 py-3"><Badge variant={stageBadgeVariant(d.stage_name)}>{d.stage_name ?? '-'}</Badge></td>
-                  <td className="px-6 py-3 text-right">¥{Number(d.amount).toLocaleString()}</td>
-                  <td className="px-6 py-3 text-right">{d.probability}%</td>
-                  <td className="px-6 py-3 text-gray-600">{formatDate(d.expected_close_date)}</td><td className="px-6 py-3 whitespace-nowrap"><Link href={`/deals/${d.id}/edit`} className="text-xs text-blue-600 hover:underline mr-2">編集</Link><form action={deleteDealAction.bind(null, d.id, undefined)} className="inline"><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DealsGrid deals={deals} />
+
     </div>
   )
 }
