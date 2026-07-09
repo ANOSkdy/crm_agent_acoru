@@ -8,14 +8,14 @@ import { logoutAction } from '@/lib/actions/auth'
 const NAV_COLLAPSED_KEY = 'acoru.crm.navCollapsed'
 
 const navItems = [
-  { href: '/dashboard', label: 'ダッシュボード', icon: 'D' },
-  { href: '/companies', label: '顧客', icon: '顧' },
-  { href: '/contacts', label: '担当者', icon: '担' },
-  { href: '/deals', label: '案件', icon: '案' },
-  { href: '/activities', label: '活動履歴', icon: '活' },
-  { href: '/tasks', label: 'タスク', icon: 'T' },
-  { href: '/files', label: 'ファイル', icon: 'F' },
-  { href: '/reports', label: 'レポート', icon: 'R' },
+  { href: '/dashboard', label: 'ダッシュボード' },
+  { href: '/companies', label: '顧客' },
+  { href: '/contacts', label: '担当者' },
+  { href: '/deals', label: '案件' },
+  { href: '/activities', label: '活動履歴' },
+  { href: '/tasks', label: 'タスク' },
+  { href: '/files', label: 'ファイル' },
+  { href: '/reports', label: 'レポート' },
 ]
 
 function isActivePath(pathname: string, href: string) {
@@ -66,7 +66,6 @@ export function AppNavigation() {
                 aria-current={active ? 'page' : undefined}
                 title={collapsed ? item.label : undefined}
               >
-                <span className="app-nav__item-icon" aria-hidden="true">{item.icon}</span>
                 <span className="app-nav__item-label">{item.label}</span>
               </Link>
             </li>
@@ -76,7 +75,6 @@ export function AppNavigation() {
       <div className="app-nav__footer">
         <form action={logoutAction}>
           <button type="submit" className="app-nav__item app-header__logout" title={collapsed ? 'ログアウト' : undefined}>
-            <span className="app-nav__item-icon" aria-hidden="true">↗</span>
             <span className="app-nav__item-label">ログアウト</span>
           </button>
         </form>
