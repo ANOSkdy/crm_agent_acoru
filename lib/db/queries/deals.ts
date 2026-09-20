@@ -12,6 +12,7 @@ export interface DealStage {
 }
 
 export interface Deal {
+  agent_revision: number
   id: string
   company_id: string
   company_name?: string

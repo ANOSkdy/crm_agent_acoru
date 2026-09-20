@@ -88,14 +88,15 @@ export async function createTask(data: {
   assigned_to?: string
 }): Promise<Task> {
   const rows = await sql`
-    INSERT INTO tasks (company_id, deal_id, title, description, due_date, priority)
+    INSERT INTO tasks (company_id, deal_id, title, description, due_date, priority, assigned_to)
     VALUES (
       ${data.company_id ?? null},
       ${data.deal_id ?? null},
       ${data.title},
       ${data.description ?? null},
       ${data.due_date ?? null},
-      ${data.priority ?? 'medium'}
+      ${data.priority ?? 'medium'},
+      ${data.assigned_to ?? null}
     )
     RETURNING *
   `

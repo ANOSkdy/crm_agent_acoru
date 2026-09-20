@@ -6,10 +6,15 @@ import { getActivitiesByCompany } from '@/lib/db/queries/activities'
 import { getDeals } from '@/lib/db/queries/deals'
 import { summarizeCompany } from '@/lib/ai/summarize-company'
 import { createAiSummary } from '@/lib/db/queries/ai_summaries'
+import { requireApiUser } from '@/lib/auth/deal-permissions'
+import { apiError, checkMutationRequest, readBody } from '@/lib/agent/http'
+import { z } from 'zod'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { companyId?: string }
+    checkMutationRequest(req)
+    await requireApiUser()
+    const body = z.object({ companyId: z.string().uuid() }).parse(await readBody(req))
     const { companyId } = body
 
     if (!companyId) {
@@ -36,7 +41,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ content })
   } catch (err) {
-    console.error('summarize-company error:', err)
-    return NextResponse.json({ error: 'AIサマリーの生成に失敗しました' }, { status: 500 })
+    return apiError(err)
   }
 }

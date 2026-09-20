@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './agent.css'
+import './assistant.css'
 
 export const metadata: Metadata = {
   title: 'Acoru CRM',
