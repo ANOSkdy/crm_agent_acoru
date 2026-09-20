@@ -1,0 +1,44 @@
+.deal-agent { margin: 2rem 0; color: var(--color-text); }
+.agent-section-title, .agent-chat__heading, .agent-progress__heading, .agent-proposal__heading, .agent-composer__footer, .agent-message__meta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.agent-section-title { margin-bottom: 1rem; flex-wrap: wrap; }
+.agent-section-title h2 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; }
+.agent-eyebrow { color: var(--color-primary); font-size: .75rem; font-weight: 700; margin-bottom: .3rem; }
+.agent-tag { display: inline-flex; padding: .3rem .6rem; border-radius: 100px; background: var(--color-primary-soft); color: var(--color-primary); font-size: .75rem; white-space: nowrap; }
+.deal-agent__columns { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.6fr); gap: 1rem; align-items: start; }
+.agent-progress, .agent-chat { padding: 1.25rem; border: 1px solid var(--color-border); border-radius: var(--radius-card, 12px); background: var(--color-surface); min-width: 0; }
+.agent-progress h3, .agent-chat h3 { font-weight: 650; font-size: .95rem; }
+.agent-progress dt { color: var(--color-text-sub); font-size: .75rem; margin-top: 1.25rem; margin-bottom: .35rem; }
+.agent-progress dd { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.7; }
+.agent-decisions-title { border-top: 1px solid var(--color-border); margin-top: 1.5rem; padding-top: 1.25rem; }
+.agent-decisions li { border-left: 2px solid var(--color-border); margin-top: 1rem; padding-left: .75rem; font-size: .8rem; line-height: 1.6; overflow-wrap: anywhere; }
+.agent-decisions time { color: var(--color-text-sub); font-size: .7rem; }
+.agent-muted { font-size: .75rem; color: var(--color-text-sub); line-height: 1.7; margin-top: .5rem; }
+.agent-welcome { border: 1px dashed var(--color-border); background: var(--color-bg); margin: 1.5rem 0; padding: 1.5rem; border-radius: 10px; font-size: .875rem; line-height: 1.8; }
+.agent-prompts { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.agent-prompts button { padding: .4rem .7rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; font-size: .75rem; cursor: pointer; text-align: left; }
+.agent-messages { display: flex; flex-direction: column; gap: 1rem; max-height: 760px; overflow-y: auto; margin: 1.25rem 0; padding-right: .25rem; }
+.agent-message { padding: 1rem; border: 1px solid var(--color-border); border-radius: 10px; min-width: 0; }
+.agent-message--user { background: var(--color-primary-soft); border-color: transparent; }
+.agent-message__meta { font-size: .7rem; color: var(--color-text-sub); margin-bottom: .5rem; flex-wrap: wrap; }
+.agent-message__content { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.85; }
+.agent-sources { margin-top: .8rem; font-size: .75rem; color: var(--color-text-sub); }
+.agent-sources summary { cursor: pointer; }
+.agent-sources ul { padding-left: 1rem; list-style: disc; margin-top: .5rem; }
+.agent-sources a { color: var(--color-primary); text-decoration: underline; }
+.agent-proposal { margin-top: 1rem; padding: 1rem; border: 1px solid var(--color-primary); border-radius: 8px; }
+.agent-proposal__heading { font-size: .8rem; flex-wrap: wrap; }
+.agent-proposal__heading span { color: var(--color-text-sub); font-size: .7rem; }
+.agent-operation { min-width: 0; border: 1px solid var(--color-border); padding: .75rem; margin-top: 1rem; border-radius: 6px; font-size: .8rem; }
+.agent-operation legend { font-weight: 650; padding: 0 .3rem; }
+.agent-field { margin-bottom: .75rem; }
+.agent-field label, .agent-composer label { display: block; font-size: .75rem; font-weight: 600; margin-bottom: .4rem; }
+.agent-field .input, .agent-composer .input { width: 100%; }
+.agent-field textarea, .agent-composer textarea { resize: vertical; height: auto; min-height: 76px; }
+.agent-composer textarea { min-height: 112px; }
+.agent-before { font-size: .7rem; color: var(--color-text-sub); white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: .4rem; }
+.agent-actions { display: flex; gap: .5rem; margin-top: 1rem; flex-wrap: wrap; }
+.agent-composer { border-top: 1px solid var(--color-border); padding-top: 1rem; }
+.agent-composer__footer { margin-top: .6rem; flex-wrap: wrap; }
+.agent-error { padding: .65rem; margin: .75rem 0; border: 1px solid #e7b3b3; border-radius: 6px; color: #a52626; background: #fff6f6; font-size: .8rem; }
+.agent-working { color: var(--color-primary); font-size: .8rem; padding: .5rem 0; }
+@media (max-width: 1050px) { .deal-agent__columns { grid-template-columns: 1fr; } .agent-messages { max-height: 580px; } }

@@ -8,6 +8,7 @@ import { logoutAction } from '@/lib/actions/auth'
 const NAV_COLLAPSED_KEY = 'acoru.crm.navCollapsed'
 
 const navItems = [
+  { href: '/assistant', label: 'AIアシスタント' },
   { href: '/dashboard', label: 'ダッシュボード' },
   { href: '/companies', label: '顧客' },
   { href: '/contacts', label: '担当者' },

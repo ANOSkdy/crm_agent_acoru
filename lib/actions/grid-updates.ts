@@ -5,6 +5,7 @@ import { updateCompany, type Company } from '@/lib/db/queries/companies'
 import { updateDealGridFields, type Deal } from '@/lib/db/queries/deals'
 import { updateContactGridFields, type Contact } from '@/lib/db/queries/contacts'
 import { updateTaskGridFields, type Task } from '@/lib/db/queries/tasks'
+import { requireDealAccess, requireTaskWrite } from '@/lib/auth/deal-permissions'
 
 export type GridActionResult<T> =
   | { ok: true; data: T }
@@ -79,6 +80,7 @@ export async function updateCompanyGridCellAction(id: string, field: CompanyGrid
 
 export async function updateDealGridCellAction(id: string, field: DealGridEditableField, value: unknown): Promise<GridActionResult<Deal>> {
   try {
+    await requireDealAccess(id, true)
     if (!validId(id)) return { ok: false, error: 'IDが不正です' }
     const data: Partial<Pick<Deal, DealGridEditableField>> = {}
     if (field === 'title') data.title = requiredText(value, '案件名')
@@ -114,6 +116,7 @@ export async function updateContactGridCellAction(id: string, field: ContactGrid
 
 export async function updateTaskGridCellAction(id: string, field: TaskGridEditableField, value: unknown): Promise<GridActionResult<Task>> {
   try {
+    await requireTaskWrite(id)
     if (!validId(id)) return { ok: false, error: 'IDが不正です' }
     const data: Partial<Pick<Task, TaskGridEditableField>> = {}
     if (field === 'title') data.title = requiredText(value, 'タイトル')

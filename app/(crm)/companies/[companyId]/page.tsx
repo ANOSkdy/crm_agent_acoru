@@ -17,6 +17,7 @@ import { createTaskAction, completeTaskAction, deleteTaskAction } from '@/lib/ac
 import { createFileAction, deleteFileAction } from '@/lib/actions/files'
 import { deleteCompanyAction } from '@/lib/actions/companies'
 import { DeleteCompanyButton } from './DeleteCompanyButton'
+import { GenerateSummaryButton } from './GenerateSummaryButton'
 import Link from 'next/link'
 import { formatDisplayDate, formatDisplayDateTime } from '@/lib/utils/date'
 
@@ -312,15 +313,7 @@ export default async function CompanyDetailPage({ params }: Props) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">AIサマリー</h2>
-            <div className="flex gap-2">
-              <a
-                href={`/api/ai/summarize-company`}
-                data-company-id={companyId}
-                className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
-              >
-                顧客サマリー生成
-              </a>
-            </div>
+            <GenerateSummaryButton companyId={companyId} />
           </div>
         </CardHeader>
         <CardBody className="p-0">

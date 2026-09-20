@@ -50,3 +50,4 @@ node_modules
 out
 dist
 *.log
+.local-test/
