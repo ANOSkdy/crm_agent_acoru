@@ -35,7 +35,10 @@ try {
     await sql`SELECT data->>'name' as name FROM billing.customers ORDER BY id`
   const targetPath = `/api/billing/pdf/${target.id}`
   await sql`INSERT INTO users(id,name,email,login_id,password_hash,role,is_active) VALUES (${id},'請求管理検証',${email},${'billing-qa-' + id},crypt(${randomBytes(32).toString('hex')},gen_salt('bf')),'admin',true)`
-  await sql`INSERT INTO user_sessions(user_id,token_hash,expires_at) VALUES (${id},${hash},now()+interval '20 minutes')`
+  // This fixture verifies billing authorization; the separate auth browser test exercises real OTP login.
+  const [credential] =
+    await sql`INSERT INTO auth_mfa_credentials(user_id,environment,secret_encrypted,confirmed_at) VALUES (${id},'local','test-only',now()) RETURNING version`
+  await sql`INSERT INTO user_sessions(user_id,token_hash,expires_at,mfa_version,auth_environment) VALUES (${id},${hash},now()+interval '20 minutes',${credential.version},'local')`
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1050 },
   })

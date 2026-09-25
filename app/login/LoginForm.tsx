@@ -5,11 +5,12 @@ import { loginAction, type LoginActionState } from '@/lib/actions/auth'
 
 const initialState: LoginActionState = {}
 
-export function LoginForm() {
+export function LoginForm({ returnTo = '/dashboard' }: { returnTo?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, initialState)
 
   return (
     <form action={formAction} className="login-form">
+      <input type="hidden" name="next" value={returnTo} />
       {state.error ? (
         <div className="login-form__error" role="alert">
           {state.error}
@@ -44,9 +45,16 @@ export function LoginForm() {
         />
       </div>
 
-      <button type="submit" disabled={pending} className="btn btn--primary login-form__submit">
-        {pending ? 'ログイン中...' : 'ログイン'}
+      <button
+        type="submit"
+        disabled={pending}
+        className="btn btn--primary login-form__submit"
+      >
+        {pending ? '確認中...' : '認証コードへ進む'}
       </button>
+      <p className="login-card__description">
+        次に1Passwordの認証コードを確認します。
+      </p>
     </form>
   )
 }
