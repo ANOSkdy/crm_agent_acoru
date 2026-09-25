@@ -1,0 +1,5 @@
+.local-test
+.env*
+tests
+docs
+scripts/billing/legacy-sanitized.json
