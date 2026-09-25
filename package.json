@@ -10,13 +10,17 @@
     "typecheck": "tsc --noEmit",
     "test:agent": "tsx --test tests/agent-schema.test.ts tests/assistant-evidence.test.ts",
     "test:agent:db": "tsx scripts/db/test-agent.ts",
+    "test:billing": "node --no-wasm-tier-up --import tsx --test tests/billing.test.ts",
+    "test:billing:browser": "tsx scripts/billing/verify-browser.mts",
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:seed": "tsx scripts/db/seed.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@pdf-lib/fontkit": "^1.1.1",
     "dotenv": "^17.4.2",
     "next": "16.2.9",
+    "pdf-lib": "^1.17.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
@@ -25,10 +29,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "agent-browser": "^0.38.1",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",

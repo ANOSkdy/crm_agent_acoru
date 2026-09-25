@@ -17,6 +17,7 @@ const navItems = [
   { href: '/tasks', label: 'タスク' },
   { href: '/files', label: 'ファイル' },
   { href: '/reports', label: 'レポート' },
+  { href: '/billing', label: '請求管理' },
 ]
 
 function isActivePath(pathname: string, href: string) {
