@@ -95,13 +95,13 @@ export async function scheduledRun(
 ) {
   const { value: settings } = await repo.settings()
   if (!settings.automation)
-    return { enabled: false, created: 0, processed: 0, errors: 0 }
+    return { enabled: false, created: 0, processed: 0, errors: 0, remaining: 0 }
   const clock = japanClock(now)
-  const result = { enabled: true, created: 0, processed: 0, errors: 0 }
-  if (clock.day >= settings.createDay && clock.hour >= settings.sendHour)
+  const result = { enabled: true, created: 0, processed: 0, errors: 0, remaining: 0 }
+  if (clock.day === settings.createDay && clock.hour >= settings.sendHour)
     result.created = (await repo.generate(clock.period, 'cron')).created
   // Only the previous billing month is eligible; historical pending invoices are never swept up.
-  if (clock.day >= settings.sendDay && clock.hour >= settings.sendHour) {
+  if (clock.day === settings.sendDay && clock.hour >= settings.sendHour) {
     const queue = (await repo.invoices(previousPeriod(clock.period)))
       .filter(
         (i) =>
@@ -111,11 +111,17 @@ export async function scheduledRun(
             ? ['draft', 'simulated'].includes(i.status)
             : i.status === 'draft'),
       )
-      .slice(0, 10)
-    for (const invoice of queue) {
+    // Reserve time to record unfinished work before the function's 300s limit.
+    const deadline = Date.now() + 240_000
+    for (const [index, invoice] of queue.entries()) {
+      if (Date.now() >= deadline) {
+        result.remaining = queue.length - index
+        break
+      }
       try {
-        await deliver(repo, invoice.id, 'cron', options)
-        result.processed++
+        const delivery = await deliver(repo, invoice.id, 'cron', options)
+        if (delivery.status === 'uncertain') result.errors++
+        else if (delivery.status !== 'skipped') result.processed++
       } catch {
         result.errors++
         await repo.event('cron', 'schedule_failed', invoice.id, {
@@ -124,5 +130,7 @@ export async function scheduledRun(
       }
     }
   }
+  if (clock.day === settings.createDay || clock.day === settings.sendDay)
+    await repo.event('cron', 'schedule_completed', clock.period, result)
   return result
 }

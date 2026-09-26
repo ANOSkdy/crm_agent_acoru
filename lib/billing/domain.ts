@@ -38,9 +38,9 @@ export const issuerSchema = z.object({
 export const settingsSchema = z.object({
   issuer: issuerSchema,
   automation: z.boolean(),
-  createDay: z.number().int().min(1).max(28),
-  sendDay: z.number().int().min(1).max(28),
-  sendHour: z.number().int().min(0).max(23),
+  createDay: z.literal(25),
+  sendDay: z.literal(1),
+  sendHour: z.literal(9),
 })
 export type Line = z.infer<typeof lineSchema>
 export type Customer = z.infer<typeof customerSchema> & {

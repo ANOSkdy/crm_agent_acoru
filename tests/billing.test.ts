@@ -199,11 +199,35 @@ test('scheduler uses JST, preserves held invoices and excludes old backlog', asy
       1,
     )
     assert.equal((await repo.invoice('INV-202607-T1')).status, 'draft')
+    await repo.generate('2026-10', 'test')
+    assert.equal((await scheduledRun(repo, options, new Date('2026-11-02T00:00:00Z'))).processed, 0)
+    assert.equal((await scheduledRun(repo, options, new Date('2026-11-26T00:00:00Z'))).created, 0)
     assert.equal(
       (await scheduledRun(repo, options, new Date('2026-10-01T01:00:00Z')))
         .processed,
       0,
     )
+  } finally {
+    await db.close()
+  }
+})
+
+test('monthly scheduler processes more than ten eligible invoices and never sends externally in test mode', async () => {
+  const { db, repo } = await setup()
+  try {
+    await repo.saveSettings({ ...defaults, automation: true }, 0, 'test')
+    for (let i = 2; i <= 12; i++) await repo.saveCustomer({ ...customer, id: `T${i}` }, 0, 'test')
+    const options = { live: false, pdf: async () => Buffer.from('pdf'), fetcher: async () => { throw Error('External send forbidden') } }
+    const created = await scheduledRun(repo, options, new Date('2026-12-25T00:00:00Z'))
+    assert.equal(created.created, 12)
+    assert.equal(created.processed, 0)
+    const sent = await scheduledRun(repo, options, new Date('2027-01-01T00:00:00Z'))
+    assert.equal(sent.processed, 12)
+    assert.equal(sent.errors, 0)
+    assert.equal(sent.remaining, 0)
+    assert.equal((await scheduledRun(repo, options, new Date('2027-01-01T00:10:00Z'))).processed, 0)
+    const config = JSON.parse(await readFile('vercel.json', 'utf8'))
+    assert.deepEqual(config.crons, [{ path: '/api/cron/billing', schedule: '0 0 1,25 * *' }])
   } finally {
     await db.close()
   }

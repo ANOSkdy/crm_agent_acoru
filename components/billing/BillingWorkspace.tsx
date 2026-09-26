@@ -373,6 +373,7 @@ function SettingsForm({
     >
       <h2>自動処理と請求元情報</h2>
       <p>請求元情報の変更は、新しく作成する請求書に反映されます。</p>
+      <p>自動処理は毎月25日・翌月1日の9時（日本時間）に実行します。</p>
       <fieldset disabled={action.busy}>
         <label className="billing-check">
           <input
@@ -391,9 +392,7 @@ function SettingsForm({
               max={28}
               required
               value={data.createDay}
-              onChange={(e) =>
-                setData({ ...data, createDay: Number(e.target.value) })
-              }
+              readOnly
             />
           </label>
           <label>
@@ -404,9 +403,7 @@ function SettingsForm({
               max={28}
               required
               value={data.sendDay}
-              onChange={(e) =>
-                setData({ ...data, sendDay: Number(e.target.value) })
-              }
+              readOnly
             />
           </label>
           <label>
@@ -417,9 +414,7 @@ function SettingsForm({
               max={23}
               required
               value={data.sendHour}
-              onChange={(e) =>
-                setData({ ...data, sendHour: Number(e.target.value) })
-              }
+              readOnly
             />
           </label>
           <label>

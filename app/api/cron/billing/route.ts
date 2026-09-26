@@ -15,7 +15,10 @@ export async function GET(request: Request) {
   )
     return new Response('Unauthorized', { status: 401 })
   try {
-    return Response.json(await scheduledRun(repository(), sendOptions()))
+    const result = await scheduledRun(repository(), sendOptions())
+    return Response.json(result, {
+      status: result.errors || result.remaining ? 503 : 200,
+    })
   } catch {
     return Response.json({ error: 'billing_job_failed' }, { status: 500 })
   }
