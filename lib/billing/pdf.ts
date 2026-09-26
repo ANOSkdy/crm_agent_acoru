@@ -152,7 +152,6 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     const issuerBottom = 653 - issuerAddress.length * 12
     text('TEL', 349, issuerBottom - 4, 8.5)
     text(d.issuer.tel.normalize('NFKC'), 373, issuerBottom - 4, 8.5)
-    text(`登録番号　${d.issuer.registration}`, 349, issuerBottom - 19, 8, muted)
 
     const subject = wrap(d.subject || period, font, 11, 440)
     if (subject.length > 2) throw Error('件名が長いため、短く調整してください')
