@@ -12,6 +12,17 @@ export const MFA_COOKIE = 'acoru_mfa_challenge'
 export const CHALLENGE_SECONDS = 5 * 60
 export const SESSION_SECONDS = 8 * 60 * 60
 
+export function otpUserId(value = process.env.OTP_USER_ID) {
+  if (
+    !value ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  )
+    throw Error('OTP user configuration unavailable')
+  return value
+}
+
 export function authEnvironment(): AuthEnvironment {
   if (process.env.VERCEL_ENV === 'production') return 'production'
   if (process.env.VERCEL_ENV === 'preview') return 'preview'

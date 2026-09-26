@@ -20,6 +20,10 @@ export async function deliver(
   options: Options,
 ) {
   const invoice = await repo.invoice(id)
+  if (invoice.billing_enabled === false)
+    throw new Error('この顧客の請求は無効です')
+  if (invoice.document.provisional)
+    throw new Error('仮作成の請求内容を確認してください')
   if (!['draft', 'simulated'].includes(invoice.status))
     throw new Error('送信可能な状態ではありません')
   if (invoice.document.reviewNote) throw new Error('移行データの確認が必要です')
@@ -99,10 +103,13 @@ export async function scheduledRun(
   // Only the previous billing month is eligible; historical pending invoices are never swept up.
   if (clock.day >= settings.sendDay && clock.hour >= settings.sendHour) {
     const queue = (await repo.invoices(previousPeriod(clock.period)))
-      .filter((i) =>
-        options.live
-          ? ['draft', 'simulated'].includes(i.status)
-          : i.status === 'draft',
+      .filter(
+        (i) =>
+          i.billing_enabled !== false &&
+          !i.document.provisional &&
+          (options.live
+            ? ['draft', 'simulated'].includes(i.status)
+            : i.status === 'draft'),
       )
       .slice(0, 10)
     for (const invoice of queue) {

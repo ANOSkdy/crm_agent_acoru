@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { type Invoice, emailContent, statusLabels } from '@/lib/billing/domain'
 import { LinesEditor, useBillingAction, yen } from './shared'
 
@@ -27,6 +28,8 @@ export function InvoiceEditor({
   const canDeliver =
     ['draft', 'simulated'].includes(invoice.status) &&
     !invoice.document.reviewNote &&
+    !invoice.document.provisional &&
+    invoice.billing_enabled !== false &&
     !dirty
   return (
     <>
@@ -47,6 +50,23 @@ export function InvoiceEditor({
         <p className="billing-banner">
           {invoice.document.reviewNote}
           。当時の宛名を保存し、この請求書の再送は停止しています。
+        </p>
+      )}
+      {invoice.company_id && (
+        <p>
+          <Link href={`/companies/${invoice.company_id}`}>
+            CRMの顧客情報を開く →
+          </Link>
+        </p>
+      )}
+      {invoice.document.provisional && (
+        <p className="billing-banner">
+          仮作成した請求書です。件名・明細・金額を確認し、「送信待ち」に変更して保存してください。
+        </p>
+      )}
+      {invoice.billing_enabled === false && (
+        <p className="billing-banner">
+          この顧客の請求は無効です。送信・送信検証は停止しています。
         </p>
       )}
       {invoice.document.imported && invoice.status === 'sent' && (
@@ -70,6 +90,7 @@ export function InvoiceEditor({
               id: invoice.id,
               version: invoice.version,
               name: data.name,
+              subject: data.subject,
               email: data.email,
               honorific: data.honorific,
               dueDate: data.dueDate,
@@ -81,6 +102,16 @@ export function InvoiceEditor({
           <h2>請求内容</h2>
           <fieldset disabled={!editable || action.busy}>
             <div className="billing-form-grid">
+              <label>
+                件名
+                <input
+                  maxLength={100}
+                  value={data.subject ?? ''}
+                  onChange={(e) =>
+                    setData({ ...data, subject: e.target.value })
+                  }
+                />
+              </label>
               <label>
                 請求先名
                 <input

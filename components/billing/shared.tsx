@@ -63,6 +63,7 @@ export function LinesEditor({
       <div className="billing-line billing-line--head">
         <span>品名</span>
         <span>数量</span>
+        <span>単位</span>
         <span>単価（税抜・円）</span>
         <span />
       </div>
@@ -95,6 +96,19 @@ export function LinesEditor({
               onChange(
                 lines.map((l, i) =>
                   i === index ? { ...l, quantity: Number(e.target.value) } : l,
+                ),
+              )
+            }
+          />
+          <input
+            aria-label={`単位 ${index + 1}`}
+            disabled={disabled}
+            maxLength={12}
+            value={line.unit ?? '式'}
+            onChange={(e) =>
+              onChange(
+                lines.map((l, i) =>
+                  i === index ? { ...l, unit: e.target.value } : l,
                 ),
               )
             }

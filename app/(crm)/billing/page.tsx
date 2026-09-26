@@ -4,7 +4,11 @@ import { japanClock } from '@/lib/billing/domain'
 import '@/app/billing.css'
 
 export const dynamic = 'force-dynamic'
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ company?: string }>
+}) {
   if (!(await billingUser()))
     return (
       <div className="p-6">
@@ -13,18 +17,20 @@ export default async function BillingPage() {
       </div>
     )
   const repo = repository()
-  const [customers, invoices, settings, deliveries, events] = await Promise.all(
-    [
+  const [customers, invoices, settings, deliveries, events, crmChoices] =
+    await Promise.all([
       repo.customers(),
       repo.invoices(),
       repo.settings(),
       repo.deliveries(),
       repo.events(),
-    ],
-  )
+      repo.crmChoices(),
+    ])
   return (
     <BillingWorkspace
       customers={customers}
+      crmChoices={crmChoices}
+      initialCompanyId={(await searchParams).company}
       invoices={invoices}
       settings={settings}
       deliveries={JSON.parse(JSON.stringify(deliveries))}

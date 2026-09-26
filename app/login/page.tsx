@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/session'
-import { LoginForm } from './LoginForm'
+import { OtpForm } from './verify/OtpForm'
 import { safeReturnTo } from '@/lib/auth/mfa-crypto'
 
 export const dynamic = 'force-dynamic'
@@ -24,9 +24,11 @@ export default async function LoginPage({
           <h1 id="login-title" className="login-card__title">
             Acoru CRM
           </h1>
-          <p className="login-card__description">社内システムログイン</p>
+          <p className="login-card__description">
+            1Passwordの認証コードを入力してください。
+          </p>
         </div>
-        <LoginForm returnTo={safeReturnTo((await searchParams).next)} />
+        <OtpForm returnTo={safeReturnTo((await searchParams).next)} />
       </section>
     </main>
   )

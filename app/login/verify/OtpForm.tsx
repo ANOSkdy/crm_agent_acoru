@@ -1,16 +1,16 @@
 'use client'
 
 import { useActionState } from 'react'
-import Link from 'next/link'
 import { verifyOtpAction, type LoginActionState } from '@/lib/actions/auth'
 
-export function OtpForm() {
+export function OtpForm({ returnTo = '/dashboard' }: { returnTo?: string }) {
   const [state, action, pending] = useActionState(
     verifyOtpAction,
     {} as LoginActionState,
   )
   return (
     <form action={action} className="login-form">
+      <input type="hidden" name="next" value={returnTo} />
       {state.error && (
         <div className="login-form__error" role="alert">
           {state.error}
@@ -43,9 +43,6 @@ export function OtpForm() {
       <p className="login-card__description">
         コードは30秒ごとに更新されます。ログインの有効期間は8時間です。
       </p>
-      <Link href="/login" className="btn btn--secondary">
-        ログインからやり直す
-      </Link>
       <p className="login-card__description">
         1Passwordを利用できない場合は、管理者にOTPの再登録を依頼してください。
       </p>

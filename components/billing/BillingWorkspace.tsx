@@ -5,13 +5,16 @@ import {
   type Customer,
   type Invoice,
   type Settings,
+  type CrmChoice,
   statusLabels,
-  terms,
 } from '@/lib/billing/domain'
-import { LinesEditor, useBillingAction, yen } from './shared'
+import { useBillingAction, yen } from './shared'
+import { CrmBillingCustomers } from './CrmBillingCustomers'
 
 type Props = {
   customers: Customer[]
+  crmChoices: CrmChoice[]
+  initialCompanyId?: string
   invoices: Invoice[]
   settings: { value: Settings; version: number }
   deliveries: Record<string, unknown>[]
@@ -21,7 +24,9 @@ type Props = {
   allowReal: boolean
 }
 export function BillingWorkspace(props: Props) {
-  const [tab, setTab] = useState('invoices')
+  const [tab, setTab] = useState(
+    props.initialCompanyId ? 'customers' : 'invoices',
+  )
   const [period, setPeriod] = useState(props.currentPeriod)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -63,7 +68,7 @@ export function BillingWorkspace(props: Props) {
       <nav className="billing-tabs" aria-label="請求管理メニュー">
         {[
           ['invoices', '請求一覧'],
-          ['customers', '顧客・契約'],
+          ['customers', '顧客・請求設定'],
           ['history', '送信・実行履歴'],
           ['settings', '設定'],
         ].map(([key, label]) => (
@@ -188,7 +193,9 @@ export function BillingWorkspace(props: Props) {
                       <td className="numeric billing-amount">{yen(i.total)}</td>
                       <td>
                         <span className={`billing-status ${i.status}`}>
-                          {statusLabels[i.status]}
+                          {i.document.provisional
+                            ? '仮作成'
+                            : statusLabels[i.status]}
                         </span>
                       </td>
                       <td>
@@ -216,9 +223,11 @@ export function BillingWorkspace(props: Props) {
         </>
       )}
       {tab === 'customers' && (
-        <Customers
+        <CrmBillingCustomers
           key={props.customers.map((c) => c.version).join(',')}
           customers={props.customers}
+          choices={props.crmChoices}
+          initialCompanyId={props.initialCompanyId}
           allowReal={props.allowReal}
         />
       )}
@@ -340,210 +349,6 @@ const eventLabels: Record<string, string> = {
   legacy_import: '既存データ移行',
 }
 
-function Customers({
-  customers,
-  allowReal,
-}: {
-  customers: Customer[]
-  allowReal: boolean
-}) {
-  const [editing, setEditing] = useState<Customer | null>(null)
-  return (
-    <>
-      <div className="billing-toolbar">
-        <p>契約変更は次回作成分から反映されます。</p>
-        <div className="billing-spacer" />
-        <button
-          className="btn btn--primary"
-          onClick={() =>
-            setEditing({
-              id: '',
-              name: '',
-              email: 'customer@example.invalid',
-              honorific: '御中',
-              status: '契約前',
-              paymentTerm: '翌月末日',
-              lines: [{ name: '', quantity: 1, unitPrice: 0 }],
-              version: 0,
-            })
-          }
-        >
-          ＋ 顧客を追加
-        </button>
-      </div>
-      {editing ? (
-        <CustomerForm
-          key={editing.id}
-          initial={editing}
-          allowReal={allowReal}
-          onClose={() => setEditing(null)}
-        />
-      ) : null}
-      <section className="billing-panel billing-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>顧客 / ID</th>
-              <th>送付先</th>
-              <th>契約</th>
-              <th>支払条件</th>
-              <th className="numeric">月額（税抜）</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {customers.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  <strong>{c.name}</strong>
-                  <small>{c.id}</small>
-                </td>
-                <td>{c.email}</td>
-                <td>{c.status}</td>
-                <td>{c.paymentTerm}</td>
-                <td className="numeric">
-                  {yen(
-                    c.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0),
-                  )}
-                </td>
-                <td>
-                  <button
-                    className="billing-text-button"
-                    onClick={() => setEditing(c)}
-                  >
-                    編集
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    </>
-  )
-}
-function CustomerForm({
-  initial,
-  onClose,
-  allowReal,
-}: {
-  initial: Customer
-  onClose: () => void
-  allowReal: boolean
-}) {
-  const [data, setData] = useState(initial)
-  const action = useBillingAction()
-  return (
-    <form
-      className="billing-panel billing-form"
-      onSubmit={async (e) => {
-        e.preventDefault()
-        if (
-          await action.run({
-            action: 'customer',
-            data,
-            version: initial.version,
-          })
-        )
-          onClose()
-      }}
-    >
-      <div className="billing-panel-head">
-        <h2>{initial.version ? '顧客・契約の編集' : '顧客の追加'}</h2>
-        <button type="button" className="billing-text-button" onClick={onClose}>
-          閉じる
-        </button>
-      </div>
-      <fieldset disabled={action.busy}>
-        <div className="billing-form-grid">
-          <label>
-            顧客ID
-            <input
-              required
-              pattern="[A-Za-z0-9_-]{1,40}"
-              disabled={initial.version > 0}
-              value={data.id}
-              onChange={(e) => setData({ ...data, id: e.target.value })}
-            />
-          </label>
-          <label>
-            会社名
-            <input
-              required
-              maxLength={120}
-              value={data.name}
-              onChange={(e) => setData({ ...data, name: e.target.value })}
-            />
-          </label>
-          <label>
-            メールアドレス
-            <input
-              type="email"
-              required
-              value={data.email}
-              onChange={(e) => setData({ ...data, email: e.target.value })}
-            />
-            <small>
-              {allowReal
-                ? '請求書作成時に送付先として保存されます'
-                : '検証用：末尾は @example.invalid'}
-            </small>
-          </label>
-          <label>
-            敬称
-            <input
-              required
-              maxLength={20}
-              value={data.honorific}
-              onChange={(e) => setData({ ...data, honorific: e.target.value })}
-            />
-          </label>
-          <label>
-            契約ステータス
-            <select
-              value={data.status}
-              onChange={(e) =>
-                setData({
-                  ...data,
-                  status: e.target.value as Customer['status'],
-                })
-              }
-            >
-              {['契約中', '契約前', '解約'].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            支払条件
-            <select
-              value={data.paymentTerm}
-              onChange={(e) =>
-                setData({
-                  ...data,
-                  paymentTerm: e.target.value as Customer['paymentTerm'],
-                })
-              }
-            >
-              {terms.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <h3>毎月の契約明細</h3>
-        <LinesEditor
-          lines={data.lines}
-          onChange={(lines) => setData({ ...data, lines })}
-        />
-        <button className="btn btn--primary" type="submit">
-          {action.busy ? '保存中…' : '保存する'}
-        </button>
-        {action.feedback}
-      </fieldset>
-    </form>
-  )
-}
 function SettingsForm({
   initial,
   live,

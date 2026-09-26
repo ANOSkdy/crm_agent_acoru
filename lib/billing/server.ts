@@ -5,9 +5,12 @@ import { BillingRepository } from './repository'
 import { createInvoicePdf } from './pdf'
 
 export function repository() {
-  return new BillingRepository({
-    query: (text, params) => getSql().query(text, params),
-  })
+  return new BillingRepository(
+    {
+      query: (text, params) => getSql().query(text, params),
+    },
+    process.env.BILLING_ALLOW_REAL_RECIPIENTS === 'true',
+  )
 }
 export function sendOptions() {
   return {

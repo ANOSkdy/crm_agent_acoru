@@ -15,6 +15,54 @@ import {
 } from '../lib/auth/mfa-crypto'
 import { MfaRepository } from '../lib/auth/mfa-repository'
 
+test('OTP-only login is pinned to one user, consumes each step once and stops disabled users', async () => {
+  const { db, user, repo } = await setup()
+  try {
+    assert.equal(await repo.otpCredential(user), undefined)
+    await db.query(
+      'INSERT INTO auth_mfa_credentials(user_id,environment,secret_encrypted) VALUES ($1,$2,$3)',
+      [user, 'preview', 'encrypted'],
+    )
+    const credential = (await repo.otpCredential(user))!
+    assert.equal(await repo.otpCredential(randomUUID()), undefined)
+    const results = await Promise.all([
+      repo.completeOtp(
+        user,
+        credential.version,
+        100,
+        tokenHash('otp-one'),
+        null,
+        null,
+      ),
+      repo.completeOtp(
+        user,
+        credential.version,
+        100,
+        tokenHash('otp-two'),
+        null,
+        null,
+      ),
+    ])
+    assert.equal(results.filter(Boolean).length, 1)
+    assert.equal((await db.query('SELECT * FROM user_sessions')).rows.length, 1)
+    await db.query('UPDATE users SET is_active=false WHERE id=$1', [user])
+    assert.equal(await repo.otpCredential(user), undefined)
+    assert.equal(
+      await repo.completeOtp(
+        user,
+        credential.version,
+        101,
+        tokenHash('disabled'),
+        null,
+        null,
+      ),
+      false,
+    )
+  } finally {
+    await db.close()
+  }
+})
+
 async function setup() {
   const db = new PGlite()
   await db.exec(`CREATE TABLE users(id uuid PRIMARY KEY, login_id text, is_active boolean DEFAULT true, locked_until timestamptz, failed_login_count integer DEFAULT 0, last_login_at timestamptz, updated_at timestamptz);

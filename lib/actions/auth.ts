@@ -1,9 +1,6 @@
 'use server'
-
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import { sql } from '@/lib/db'
-import { verifyPassword } from '@/lib/auth/password'
 import {
   createSessionToken,
   hashSessionToken,
@@ -11,135 +8,41 @@ import {
   getCurrentUser,
   revokeCurrentSession,
 } from '@/lib/auth/session'
-import { getUserByLoginId, markLoginFailure } from '@/lib/db/queries/users'
+import { loginRequest, mfaRepository } from '@/lib/auth/mfa'
 import {
-  LOGIN_ERROR_MESSAGE,
-  LOCKED_ERROR_MESSAGE,
-  loginSchema,
-} from '@/lib/validation/auth'
-import { loginRequest, mfaRepository, pendingChallenge } from '@/lib/auth/mfa'
-import {
-  authEnvironment,
-  CHALLENGE_SECONDS,
   decryptSecret,
-  encryptSecret,
-  MFA_COOKIE,
-  newSecret,
+  otpUserId,
   safeReturnTo,
   verifyCode,
 } from '@/lib/auth/mfa-crypto'
 
-export type LoginActionState = {
-  error?: string
-}
-
-async function insertAuditLog(
-  action: string,
-  userId?: string,
-  metadata?: Record<string, unknown>,
-) {
-  await sql`
-    INSERT INTO audit_logs (user_id, action, target_type, after_json)
-    VALUES (${userId ?? null}, ${action}, 'auth', ${metadata ? JSON.stringify(metadata) : null})
-  `
-}
-
-export async function loginAction(
-  _previousState: LoginActionState,
-  formData: FormData,
-): Promise<LoginActionState> {
-  let returnTo = '/dashboard'
-  try {
-    const request = await loginRequest()
-    const repo = mfaRepository()
-    if (
-      !(await repo.rateLimit('password-ip', request.ip, 50)) ||
-      !(await repo.rateLimit('password-global', 'all', 500))
-    ) {
-      return { error: LOCKED_ERROR_MESSAGE }
-    }
-    const parsed = loginSchema.safeParse({
-      login_id: formData.get('login_id'),
-      password: formData.get('password'),
-    })
-
-    if (!parsed.success) {
-      return { error: LOGIN_ERROR_MESSAGE }
-    }
-
-    const { login_id: loginId, password } = parsed.data
-    if (!(await repo.rateLimit('password-account', loginId.toLowerCase(), 10)))
-      return { error: LOCKED_ERROR_MESSAGE }
-    const user = await getUserByLoginId(loginId)
-
-    if (!user) {
-      await insertAuditLog('login_failed', undefined, { login_id: loginId })
-      return { error: LOGIN_ERROR_MESSAGE }
-    }
-
-    if (!user.is_active) {
-      await insertAuditLog('login_failed', user.id, { reason: 'inactive' })
-      return { error: LOGIN_ERROR_MESSAGE }
-    }
-
-    if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      await insertAuditLog('login_failed', user.id, { reason: 'locked' })
-      return { error: LOCKED_ERROR_MESSAGE }
-    }
-
-    const verified = await verifyPassword(password, user.password_hash)
-    if (!verified) {
-      await markLoginFailure(user.id)
-      await insertAuditLog('login_failed', user.id)
-      return { error: LOGIN_ERROR_MESSAGE }
-    }
-
-    returnTo = safeReturnTo(formData.get('next'))
-    const environment = authEnvironment()
-    const token = await repo.begin(
-      user.id,
-      encryptSecret(newSecret(), `${environment}:${user.id}`),
-      returnTo,
-    )
-    const cookieStore = await cookies()
-    cookieStore.set(MFA_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: CHALLENGE_SECONDS,
-    })
-    await repo.cleanup()
-  } catch {
-    return {
-      error:
-        '現在ログインできません。時間をおいて再度お試しいただくか、管理者にご確認ください。',
-    }
-  }
-  redirect('/login/verify')
-}
-
+export type LoginActionState = { error?: string }
 export async function verifyOtpAction(
-  _previousState: LoginActionState,
+  _state: LoginActionState,
   formData: FormData,
 ): Promise<LoginActionState> {
   let returnTo = '/dashboard'
   try {
     const request = await loginRequest()
     const repo = mfaRepository()
-    if (!(await repo.rateLimit('otp-ip', request.ip, 50)))
-      return { error: LOCKED_ERROR_MESSAGE }
-    const challenge = await pendingChallenge(true)
-    if (!challenge)
+    const userId = otpUserId()
+    if (
+      !(await repo.rateLimit('otp-only-ip', request.ip, 10, 300)) ||
+      !(await repo.rateLimit('otp-only-user', userId, 10, 300))
+    )
       return {
         error:
-          '認証の有効期限が切れたか、試行回数の上限に達しました。ログインからやり直してください。',
+          '試行回数の上限に達しました。5分ほど待ってから再度お試しください。',
       }
-    if (!(await repo.rateLimit('otp-user', challenge.user_id, 10)))
-      return { error: LOCKED_ERROR_MESSAGE }
+    const credential = await repo.otpCredential(userId)
+    if (!credential)
+      return {
+        error:
+          'OTPが未登録か、現在ログインできません。管理者にご確認ください。',
+      }
     const secret = decryptSecret(
-      challenge.secret_encrypted,
-      `${repo.environment}:${challenge.user_id}`,
+      credential.secret_encrypted,
+      `${repo.environment}:${userId}`,
     )
     const step = verifyCode(secret, formData.get('code'))
     if (step === null)
@@ -147,28 +50,22 @@ export async function verifyOtpAction(
         error:
           '認証できませんでした。1Passwordの最新の6桁コードをご確認ください。',
       }
-    const sessionToken = createSessionToken()
-    const completed = await repo.complete(
-      challenge,
-      step,
-      hashSessionToken(sessionToken),
-      request.userAgent,
-      request.ip,
+    const token = createSessionToken()
+    if (
+      !(await repo.completeOtp(
+        userId,
+        credential.version,
+        step,
+        hashSessionToken(token),
+        request.userAgent,
+        request.ip,
+      ))
     )
-    if (!completed)
       return {
-        error:
-          'このコードは使用済みか有効期限切れです。新しいコードで再度お試しください。',
+        error: 'このコードは使用済みです。新しいコードで再度お試しください。',
       }
-    await setSessionCookie(sessionToken)
-    ;(await cookies()).set(MFA_COOKIE, '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 0,
-    })
-    returnTo = safeReturnTo(challenge.return_to)
+    await setSessionCookie(token)
+    returnTo = safeReturnTo(formData.get('next'))
   } catch {
     return {
       error:
@@ -177,14 +74,10 @@ export async function verifyOtpAction(
   }
   redirect(returnTo)
 }
-
 export async function logoutAction() {
   const user = await getCurrentUser()
   await revokeCurrentSession()
-
-  if (user) {
-    await insertAuditLog('logout', user.id)
-  }
-
+  if (user)
+    await sql`INSERT INTO audit_logs(user_id,action,target_type) VALUES (${user.id},'logout','auth')`
   redirect('/login')
 }

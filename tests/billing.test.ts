@@ -28,7 +28,13 @@ const customer: Customer = {
 }
 async function setup() {
   const db = new PGlite()
+  await db.exec(`CREATE TABLE companies(id uuid PRIMARY KEY,name text,status text DEFAULT 'active',address text,postal_code text,deleted_at timestamptz);
+    CREATE TABLE contacts(id uuid PRIMARY KEY,company_id uuid,name text,email text,deleted_at timestamptz);
+    CREATE TABLE deals(id uuid PRIMARY KEY,company_id uuid,title text,amount bigint,created_at timestamptz DEFAULT now(),deleted_at timestamptz);`)
   await db.exec(await readFile('scripts/db/migrations/004_billing.sql', 'utf8'))
+  await db.exec(
+    await readFile('scripts/db/migrations/006_crm_billing.sql', 'utf8'),
+  )
   const repo = new BillingRepository({
     query: async (text, params) =>
       (await db.query(text, params)).rows as Record<string, unknown>[],

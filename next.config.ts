@@ -16,8 +16,14 @@ const nextConfig: NextConfig = {
     ]
   },
   outputFileTracingIncludes: {
-    '/api/billing/**': ['./assets/fonts/NotoSansJP-Regular.ttf'],
-    '/api/cron/billing': ['./assets/fonts/NotoSansJP-Regular.ttf'],
+    '/api/billing/**': [
+      './assets/fonts/NotoSansJP-Regular.ttf',
+      './assets/brand/acoru-logo.png',
+    ],
+    '/api/cron/billing': [
+      './assets/fonts/NotoSansJP-Regular.ttf',
+      './assets/brand/acoru-logo.png',
+    ],
   },
 }
 

@@ -31,7 +31,7 @@ async function reset() {
     sql`INSERT INTO audit_logs(user_id, action, target_type, after_json) VALUES (${userId}, 'mfa_reset_by_operator', 'auth', ${JSON.stringify({ environment })})`,
   ])
   console.log(
-    'OTP reset for the selected user and environment. Existing MFA sessions revoked. Initial registration is required on next login.',
+    'OTP reset for the selected user and environment. Sessions revoked. Run the offline setup-otp tool before login; public self-enrollment is disabled.',
   )
 }
 reset().catch(() => {

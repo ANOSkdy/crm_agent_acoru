@@ -29,6 +29,52 @@ export class MfaRepository {
     readonly environment: AuthEnvironment,
   ) {}
 
+  async otpCredential(userId: string) {
+    const rows = await this.db.query(
+      `SELECT m.user_id, m.version, m.secret_encrypted
+      FROM auth_mfa_credentials m JOIN users u ON u.id=m.user_id
+      WHERE m.user_id=$1 AND m.environment=$2 AND u.is_active=true`,
+      [userId, this.environment],
+    )
+    return rows[0] as
+      { user_id: string; version: string; secret_encrypted: string } | undefined
+  }
+
+  async completeOtp(
+    userId: string,
+    version: string,
+    step: number,
+    sessionHash: string,
+    userAgent: string | null,
+    ip: string | null,
+  ) {
+    const rows = await this.db.query(
+      `WITH accepted AS (
+      UPDATE auth_mfa_credentials m SET last_used_step=$4, confirmed_at=COALESCE(confirmed_at,now())
+      WHERE user_id=$1 AND environment=$2 AND version=$3 AND last_used_step<$4
+        AND EXISTS(SELECT 1 FROM users WHERE id=$1 AND is_active=true)
+      RETURNING user_id,version
+    ), session AS (
+      INSERT INTO user_sessions(user_id,token_hash,expires_at,user_agent,ip_address,mfa_version,auth_environment)
+      SELECT user_id,$5,now()+make_interval(secs=>$6),$7,$8,version,$2 FROM accepted RETURNING user_id
+    ), logged AS (
+      INSERT INTO audit_logs(user_id,action,target_type,after_json)
+      SELECT user_id,'login_success_otp','auth',jsonb_build_object('environment',$2::text) FROM session
+    ) SELECT user_id FROM session`,
+      [
+        userId,
+        this.environment,
+        version,
+        step,
+        sessionHash,
+        SESSION_SECONDS,
+        userAgent?.slice(0, 512) ?? null,
+        ip?.slice(0, 128) ?? null,
+      ],
+    )
+    return rows.length === 1
+  }
+
   async rateLimit(
     scope: string,
     identifier: string,

@@ -10,6 +10,7 @@ export const lineSchema = z.object({
   name: z.string().trim().min(1).max(120),
   quantity: z.number().int().min(1).max(100000),
   unitPrice: z.number().int().min(0).max(100000000),
+  unit: z.string().trim().max(12).optional(),
 })
 export const customerSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
@@ -19,6 +20,12 @@ export const customerSchema = z.object({
   status: z.enum(['契約中', '契約前', '解約']),
   paymentTerm: z.enum(terms),
   lines: z.array(lineSchema).min(1).max(100),
+  companyId: z.uuid().nullable().optional(),
+  contactId: z.uuid().nullable().optional(),
+  sourceDealId: z.uuid().nullable().optional(),
+  billingEnabled: z.boolean().optional(),
+  templateConfirmed: z.boolean().optional(),
+  subject: z.string().trim().max(100).optional(),
 })
 export const issuerSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -36,11 +43,23 @@ export const settingsSchema = z.object({
   sendHour: z.number().int().min(0).max(23),
 })
 export type Line = z.infer<typeof lineSchema>
-export type Customer = z.infer<typeof customerSchema> & { version: number }
+export type Customer = z.infer<typeof customerSchema> & {
+  version: number
+  address?: string
+  postalCode?: string
+}
+export type CrmChoice = {
+  id: string
+  name: string
+  contacts: { id: string; name: string; hasEmail: boolean }[]
+  deals: { id: string; title: string; amount: number }[]
+}
 export type Settings = z.infer<typeof settingsSchema>
 export type Invoice = {
   id: string
   customer_id: string | null
+  company_id?: string | null
+  billing_enabled?: boolean
   period: string
   status: 'draft' | 'simulated' | 'held' | 'sending' | 'uncertain' | 'sent'
   document: {
@@ -53,6 +72,10 @@ export type Invoice = {
     issuer: Settings['issuer']
     reviewNote?: string
     imported?: boolean
+    subject?: string
+    address?: string
+    postalCode?: string
+    provisional?: boolean
   }
   version: number
   subtotal: number
@@ -166,6 +189,8 @@ export function assertLiveSend(
     throw new Error('ダミーアドレスには外部送信できません')
   if (invoice.document.reviewNote)
     throw new Error('移行時の不整合を解決してください')
+  if (invoice.document.provisional || invoice.total <= 0)
+    throw new Error('仮作成の請求内容を確認してください')
   if (
     invoice.document.issuer.bank === '未設定' ||
     invoice.document.issuer.registration === 'T0000000000000'

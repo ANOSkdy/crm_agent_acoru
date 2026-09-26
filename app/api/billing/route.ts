@@ -17,6 +17,7 @@ const command = z.discriminatedUnion('action', [
     id: z.string().max(100),
     version,
     name: z.string().trim().min(1).max(120),
+    subject: z.string().trim().max(100).optional(),
     email: z.email(),
     honorific: z.string().trim().min(1).max(20),
     dueDate: date,
@@ -41,7 +42,14 @@ export async function POST(request: Request) {
     if (input.action === 'generate')
       return Response.json(await repo.generate(input.period, user.id))
     if (input.action === 'customer')
-      await repo.saveCustomer(input.data, input.version, user.id, allowReal)
+      return Response.json(
+        (await repo.saveCustomer(
+          input.data,
+          input.version,
+          user.id,
+          allowReal,
+        )) ?? { message: '保存しました' },
+      )
     if (input.action === 'settings')
       await repo.saveSettings(input.data, input.version, user.id)
     if (input.action === 'deliver')
@@ -60,6 +68,7 @@ export async function POST(request: Request) {
         {
           ...invoice.document,
           name: input.name,
+          subject: input.subject ?? invoice.document.subject,
           email: input.email,
           honorific: input.honorific,
           dueDate: input.dueDate,

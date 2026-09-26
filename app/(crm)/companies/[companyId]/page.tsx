@@ -19,6 +19,7 @@ import { deleteCompanyAction } from '@/lib/actions/companies'
 import { DeleteCompanyButton } from './DeleteCompanyButton'
 import { GenerateSummaryButton } from './GenerateSummaryButton'
 import Link from 'next/link'
+import { billingUser, repository } from '@/lib/billing/server'
 import { formatDisplayDate, formatDisplayDateTime } from '@/lib/utils/date'
 
 const formatDate = formatDisplayDate
@@ -55,6 +56,16 @@ export default async function CompanyDetailPage({ params }: Props) {
   ])
 
   if (!company) notFound()
+
+  const billingAdmin = await billingUser()
+  const billingCustomer = billingAdmin
+    ? (await repository().customers()).find((c) => c.companyId === companyId)
+    : null
+  const linkedInvoices = billingAdmin
+    ? (await repository().invoices())
+        .filter((i) => i.company_id === companyId)
+        .slice(0, 6)
+    : []
 
   const now = new Date()
 
@@ -99,6 +110,40 @@ export default async function CompanyDetailPage({ params }: Props) {
           </dl>
         </CardBody>
       </Card>
+
+      {/* Billing */}
+      {billingAdmin && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">請求設定・請求履歴</h2>
+              <Link
+                className="btn btn--primary"
+                href={`/billing?company=${companyId}`}
+              >
+                請求の有効／無効を設定
+              </Link>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <p>
+              請求：{billingCustomer?.billingEnabled ? '有効' : '無効'} ／
+              有効にすると今月分の請求書を仮作成します。
+            </p>
+            <div className="flex flex-wrap gap-3 mt-3">
+              {linkedInvoices.map((i) => (
+                <Link
+                  key={i.id}
+                  className="text-blue-600 underline"
+                  href={`/billing/${i.id}`}
+                >
+                  {i.period}　{Number(i.total).toLocaleString()}円
+                </Link>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Contacts */}
       <Card>

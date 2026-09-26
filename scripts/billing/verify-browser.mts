@@ -10,10 +10,12 @@ const sql = neon(process.env.DATABASE_URL)
 const base = process.env.BILLING_TEST_URL ?? 'http://localhost:3100'
 if (!base.startsWith('http://localhost:'))
   throw Error('Browser test is restricted to localhost')
-const id = randomUUID(),
+const id = process.env.BILLING_TEST_USER_ID ?? randomUUID(),
   token = randomBytes(32).toString('base64url'),
   hash = createHash('sha256').update(token).digest('hex')
 const email = `billing-qa-${id}@example.invalid`
+if ((await sql`SELECT id FROM users WHERE id=${id}`).length)
+  throw Error('Refusing to alter an existing user')
 const browser = await chromium.launch({ channel: 'msedge', headless: true })
 try {
   const latest =
@@ -97,13 +99,13 @@ try {
     timeout: 45000,
   })
   await page.goto(base + '/billing')
-  await page.getByRole('button', { name: '顧客・契約', exact: true }).click()
+  await page.getByRole('button', { name: '顧客・請求設定', exact: true }).click()
   await expect(
     page.getByText(customerNames[0].name, { exact: true }),
   ).toBeVisible()
-  await page.getByRole('button', { name: '編集', exact: true }).first().click()
-  await page.getByLabel(/メールアドレス/).fill('unapproved@example.com')
-  await page.getByRole('button', { name: '保存する', exact: true }).click()
+  await page.getByRole('button', { name: '請求設定', exact: true }).first().click()
+  await page.getByLabel(/送付先メール/).fill('unapproved@example.com')
+  await page.getByRole('button', { name: '請求設定を保存', exact: true }).click()
   await expect(
     page.getByRole('alert').filter({ hasText: 'ダミーアドレスのみ' }),
   ).toBeVisible()

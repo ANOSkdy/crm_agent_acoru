@@ -8,7 +8,12 @@ import {
   touchSession,
 } from '@/lib/db/queries/sessions'
 import type { AppUser } from '@/lib/db/queries/users'
-import { authEnvironment, encryptionKey, SESSION_SECONDS } from './mfa-crypto'
+import {
+  authEnvironment,
+  encryptionKey,
+  otpUserId,
+  SESSION_SECONDS,
+} from './mfa-crypto'
 
 export const SESSION_COOKIE_NAME = 'acoru_session'
 export const SESSION_MAX_AGE_SECONDS = SESSION_SECONDS
@@ -47,6 +52,7 @@ function getExpiredCookieOptions() {
 export async function getCurrentUser(): Promise<AppUser | null> {
   try {
     encryptionKey()
+    otpUserId()
   } catch {
     return null
   }
@@ -59,7 +65,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     tokenHash,
     authEnvironment(),
   )
-  if (!session) return null
+  if (!session || session.user_id !== otpUserId()) return null
 
   await touchSession(tokenHash)
   return session.user
