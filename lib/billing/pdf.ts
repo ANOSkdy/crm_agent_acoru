@@ -2,7 +2,7 @@ import { PDFDocument, rgb, type PDFFont } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { Invoice } from './domain'
+import { documentSubject, type Invoice } from './domain'
 import { ACORU_TEMPLATE, type DocumentOptions } from './template'
 
 let fontBytes: Promise<Buffer> | undefined
@@ -42,7 +42,6 @@ export async function createBusinessDocumentPdf(
   const number = (n: number) => n.toLocaleString('ja-JP')
   const fit = (s: string, size: number, width: number) =>
     Math.min(size, width / Math.max(font.widthOfTextAtSize(s, 1), 1))
-  const period = `${invoice.period.slice(0, 4)}年${Number(invoice.period.slice(5))}月分`
   const quotationTerms =
     options.kind === 'quotation'
       ? [
@@ -192,7 +191,7 @@ export async function createBusinessDocumentPdf(
     text('TEL', 349, issuerBottom - 4, 8.5)
     text(d.issuer.tel.normalize('NFKC'), 373, issuerBottom - 4, 8.5)
 
-    const subject = wrap(d.subject || period, font, 11, 440)
+    const subject = wrap(documentSubject(d), font, 11, 440)
     if (subject.length > 2) throw Error('件名が長いため、短く調整してください')
     text('件名', 52, 572, 9, muted)
     subject.forEach((s, i) => text(s, 84, 572 - i * 15, 11))

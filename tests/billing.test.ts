@@ -10,6 +10,7 @@ import {
   previousPeriod,
   totals,
   assertRecipient,
+  documentSubject,
   type Customer,
 } from '../lib/billing/domain'
 import { BillingRepository } from '../lib/billing/repository'
@@ -212,6 +213,9 @@ test('Japanese PDF supports more than seven items with page totals', async () =>
   try {
     await repo.generate('2026-09', 'test')
     const inv = await repo.invoice('INV-202609-T1')
+    assert.equal(documentSubject(inv.document), 'システム保守')
+    assert.equal(documentSubject({ ...inv.document, subject: '登録した件名', dealTitle: '案件名' }), '登録した件名')
+    assert.equal(documentSubject({ ...inv.document, subject: '　 ', dealTitle: '案件名' }), '案件名')
     inv.document.lines = Array.from({ length: 25 }, (_, i) => ({
       name: `システム保守・運用支援 ${i + 1}`,
       quantity: 1,

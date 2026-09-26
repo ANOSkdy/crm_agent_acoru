@@ -73,6 +73,7 @@ export type Invoice = {
     reviewNote?: string
     imported?: boolean
     subject?: string
+    dealTitle?: string
     address?: string
     postalCode?: string
     provisional?: boolean
@@ -170,6 +171,14 @@ export function emailContent(invoice: Invoice) {
     subject: `【${d.name}】${year}年${Number(month)}月分のご請求書`,
     text: `${d.name} ${d.honorific}\n\nいつもお世話になっております。\n${d.issuer.name} 角谷です。\n\n${year}年${Number(month)}月分のご請求書をお送りいたします。\n添付ファイルをご確認くださいますようお願い申し上げます。\n\nご不明な点がございましたら、お気軽にお問い合わせください。\n今後とも何卒よろしくお願い申し上げます。\n\n---\n${d.issuer.name}\n${d.issuer.address}\n${d.issuer.tel}`,
   }
+}
+export function documentSubject(document: Invoice['document']) {
+  return (
+    document.subject?.trim() ||
+    document.dealTitle?.trim() ||
+    document.lines[0]?.name.trim() ||
+    ''
+  )
 }
 export const statusLabels: Record<Invoice['status'], string> = {
   draft: '送信待ち',

@@ -88,7 +88,11 @@ export class BillingRepository {
           (choice?.contacts.length === 1 ? choice.contacts[0].id : null),
         sourceDealId:
           (row?.source_deal_id as string | null) ?? deal?.id ?? null,
-        subject: data?.subject ?? deal?.title ?? '月次ご請求',
+        subject:
+          data?.subject ??
+          choice?.deals.find((d) => d.id === row?.source_deal_id)?.title ??
+          deal?.title ??
+          '',
         address: String(company.address ?? ''),
         postalCode: String(company.postal_code ?? ''),
       } as Customer)
@@ -313,6 +317,16 @@ export class BillingRepository {
     }
     assertRecipient(email, this.allowRealRecipients)
     const enriched = customer as Customer
+    // Keep the linked project's title in the document snapshot so later CRM
+    // edits cannot silently change an already-created invoice.
+    let dealTitle = ''
+    if (customer.companyId && customer.sourceDealId) {
+      const [deal] = await this.db.query(
+        'SELECT title FROM deals WHERE id=$1 AND company_id=$2 AND deleted_at IS NULL',
+        [customer.sourceDealId, customer.companyId],
+      )
+      dealTitle = String(deal?.title ?? '')
+    }
     return {
       name: customer.name,
       email,
@@ -320,7 +334,8 @@ export class BillingRepository {
       ...invoiceDates(period, customer.paymentTerm),
       lines: customer.lines,
       issuer: settings.issuer,
-      subject: customer.subject ?? '月次ご請求',
+      subject: customer.subject ?? '',
+      dealTitle,
       address: enriched.address ?? '',
       postalCode: enriched.postalCode ?? '',
       provisional: customer.templateConfirmed === false,

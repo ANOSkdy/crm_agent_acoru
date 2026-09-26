@@ -39,6 +39,22 @@ async function setup() {
   await repo.saveSettings(defaults, 0, 'test')
   return { db, repo, company, contact, deal }
 }
+test('PDF subject snapshots the selected deal when the registered subject is blank', async () => {
+  const { db, repo, company, deal } = await setup()
+  try {
+    await db.query('INSERT INTO deals(id,company_id,title,amount) VALUES ($1,$2,$3,$4)', [randomUUID(), company, '別案件', 10000])
+    const customer = (await repo.customers())[0]
+    await repo.saveCustomer({ ...customer, sourceDealId: deal, subject: '　 ', billingEnabled: true }, 0, 'test')
+    const invoice = (await repo.invoices())[0]
+    assert.equal(invoice.document.subject, '')
+    assert.equal(invoice.document.dealTitle, '導入支援')
+    await db.query('UPDATE deals SET title=$1 WHERE id=$2', ['変更後の案件名', deal])
+    assert.equal((await repo.invoice(invoice.id)).document.dealTitle, '導入支援')
+  } finally {
+    await db.close()
+  }
+})
+
 test('CRM toggle creates provisional invoice atomically, keeps dummy recipient, blocks duplicates and disabled sends', async () => {
   const { db, repo, company } = await setup()
   try {
