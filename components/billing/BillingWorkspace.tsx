@@ -373,7 +373,7 @@ function SettingsForm({
     >
       <h2>自動処理と請求元情報</h2>
       <p>請求元情報の変更は、新しく作成する請求書に反映されます。</p>
-      <p>自動処理は毎月25日・翌月1日の9時（日本時間）に実行します。</p>
+      <p>請求書作成は毎月25〜28日、送信は翌月1〜3日の9時（日本時間）に実行します。作成済み・送信済みは重複処理しません。送信結果が不明な場合は確認が必要です。</p>
       <fieldset disabled={action.busy}>
         <label className="billing-check">
           <input
@@ -385,7 +385,7 @@ function SettingsForm({
         </label>
         <div className="billing-form-grid">
           <label>
-            当月分の作成日
+            当月分の作成開始日（28日まで毎朝確認）
             <input
               type="number"
               min={1}
@@ -396,7 +396,7 @@ function SettingsForm({
             />
           </label>
           <label>
-            翌月の送信日
+            翌月の送信開始日（3日まで毎朝確認）
             <input
               type="number"
               min={1}

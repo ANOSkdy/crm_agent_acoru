@@ -200,8 +200,8 @@ test('scheduler uses JST, preserves held invoices and excludes old backlog', asy
     )
     assert.equal((await repo.invoice('INV-202607-T1')).status, 'draft')
     await repo.generate('2026-10', 'test')
-    assert.equal((await scheduledRun(repo, options, new Date('2026-11-02T00:00:00Z'))).processed, 0)
-    assert.equal((await scheduledRun(repo, options, new Date('2026-11-26T00:00:00Z'))).created, 0)
+    assert.equal((await scheduledRun(repo, options, new Date('2026-11-04T00:00:00Z'))).processed, 0)
+    assert.equal((await scheduledRun(repo, options, new Date('2026-11-29T00:00:00Z'))).created, 0)
     assert.equal(
       (await scheduledRun(repo, options, new Date('2026-10-01T01:00:00Z')))
         .processed,
@@ -227,7 +227,56 @@ test('monthly scheduler processes more than ten eligible invoices and never send
     assert.equal(sent.remaining, 0)
     assert.equal((await scheduledRun(repo, options, new Date('2027-01-01T00:10:00Z'))).processed, 0)
     const config = JSON.parse(await readFile('vercel.json', 'utf8'))
-    assert.deepEqual(config.crons, [{ path: '/api/cron/billing', schedule: '0 0 1,25 * *' }])
+    assert.deepEqual(config.crons, [{ path: '/api/cron/billing', schedule: '0 0 1-3,25-28 * *' }])
+  } finally {
+    await db.close()
+  }
+})
+
+test('sending buffer covers days 1-3, retries pre-send failures and excludes accepted or uncertain deliveries', async () => {
+  const { db, repo } = await setup()
+  try {
+    await repo.saveSettings({ ...defaults, automation: true }, 0, 'test')
+    for (const id of ['T2', 'T3']) await repo.saveCustomer({ ...customer, id }, 0, 'test')
+    await repo.generate('2026-12', 'test')
+    await db.query("UPDATE billing.invoices SET status='uncertain' WHERE customer_id='T3'")
+    let ready = false
+    const options = { live: false, pdf: async () => { if (!ready) throw Error('Pre-send generation failure'); return Buffer.from('pdf') } }
+    assert.equal((await scheduledRun(repo, options, new Date('2027-01-01T00:00:00Z'))).errors, 2)
+    assert.equal((await repo.deliveries()).length, 0)
+    ready = true
+    assert.equal((await scheduledRun(repo, options, new Date('2027-01-02T00:00:00Z'))).processed, 2)
+    assert.equal((await scheduledRun(repo, options, new Date('2027-01-03T00:00:00Z'))).processed, 0)
+    assert.equal((await repo.invoice('INV-202612-T3')).status, 'uncertain')
+    await repo.saveCustomer({ ...customer, id: 'T4' }, 0, 'test')
+    await repo.generate('2026-12', 'test')
+    assert.equal((await scheduledRun(repo, options, new Date('2027-01-03T01:00:00Z'))).processed, 1)
+    await repo.saveCustomer({ ...customer, id: 'T5' }, 0, 'test')
+    await repo.generate('2026-12', 'test')
+    assert.equal((await scheduledRun(repo, options, new Date('2027-01-04T00:00:00Z'))).processed, 0)
+  } finally {
+    await db.close()
+  }
+})
+
+test('creation retries on 25-28 only, fills missing invoices and never sends on creation days', async () => {
+  const { db, repo } = await setup()
+  try {
+    await repo.saveSettings({ ...defaults, automation: true }, 0, 'test')
+    await repo.generate('2026-08', 'test')
+    const options = { live: false, pdf: async () => { throw Error('Creation must not send') } }
+    for (let day = 25; day <= 28; day++) {
+      if (day > 25) await repo.saveCustomer({ ...customer, id: `T${day}` }, 0, 'test')
+      const now = new Date(`2026-09-${day}T00:00:00Z`)
+      const result = await scheduledRun(repo, options, now)
+      assert.equal(result.created, 1)
+      assert.equal(result.processed, 0)
+      assert.equal((await scheduledRun(repo, options, now)).created, 0)
+    }
+    await repo.saveCustomer({ ...customer, id: 'TOO-LATE' }, 0, 'test')
+    assert.equal((await scheduledRun(repo, options, new Date('2026-09-29T00:00:00Z'))).created, 0)
+    assert.equal((await repo.invoices('2026-09')).length, 4)
+    assert.equal((await repo.invoice('INV-202608-T1')).status, 'draft')
   } finally {
     await db.close()
   }

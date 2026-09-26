@@ -97,11 +97,13 @@ export async function scheduledRun(
   if (!settings.automation)
     return { enabled: false, created: 0, processed: 0, errors: 0, remaining: 0 }
   const clock = japanClock(now)
+  const creationDay = clock.day >= settings.createDay && clock.day <= 28
+  const sendingDay = clock.day >= settings.sendDay && clock.day <= 3
   const result = { enabled: true, created: 0, processed: 0, errors: 0, remaining: 0 }
-  if (clock.day === settings.createDay && clock.hour >= settings.sendHour)
+  if (creationDay && clock.hour >= settings.sendHour)
     result.created = (await repo.generate(clock.period, 'cron')).created
   // Only the previous billing month is eligible; historical pending invoices are never swept up.
-  if (clock.day === settings.sendDay && clock.hour >= settings.sendHour) {
+  if (sendingDay && clock.hour >= settings.sendHour) {
     const queue = (await repo.invoices(previousPeriod(clock.period)))
       .filter(
         (i) =>
@@ -130,7 +132,7 @@ export async function scheduledRun(
       }
     }
   }
-  if (clock.day === settings.createDay || clock.day === settings.sendDay)
+  if (creationDay || sendingDay)
     await repo.event('cron', 'schedule_completed', clock.period, result)
   return result
 }
