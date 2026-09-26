@@ -20,7 +20,7 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     pdf.embedPng(await logoBytes),
   ])
   const d = invoice.document
-  pdf.setTitle(`請求書 ${invoice.id}`)
+  pdf.setTitle(`請求書 ${d.name} ${invoice.period}`)
   pdf.setAuthor(d.issuer.name)
   pdf.setCreationDate(new Date(`${d.issueDate}T00:00:00Z`))
   pdf.setModificationDate(new Date(`${d.issueDate}T00:00:00Z`))
@@ -35,20 +35,13 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     Math.min(size, width / Math.max(font.widthOfTextAtSize(s, 1), 1))
   const period = `${invoice.period.slice(0, 4)}年${Number(invoice.period.slice(5))}月分`
   const bank = wrap(d.issuer.bank.trim(), font, 9, 367)
-  const notes = wrap(
-    d.notes?.trim() ||
-      `対象期間：${period}\nご不明点は発行元までお問い合わせください。`,
-    font,
-    9,
-    258,
-  )
   const bankY = 58,
     bankHeight = Math.max(78, 38 + bank.length * 13)
   const summaryY = bankY + bankHeight + 18
-  const summaryHeight = Math.max(76, 32 + notes.length * 13)
+  const summaryHeight = 76
   const footerTop = summaryY + summaryHeight
   if (footerTop > 420)
-    throw Error('補足事項または振込先の文章が長いため、短く調整してください')
+    throw Error('振込先の文章が長いため、短く調整してください')
 
   const sections: { lines: typeof d.lines; heights: number[] }[] = []
   let current: typeof d.lines = [],
@@ -141,9 +134,7 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     center('請 求 書', 297.75, 761, 25)
     center('I N V O I C E', 297.75, 742, 8, purple)
     const [year, month, day] = d.issueDate.split('-').map(Number)
-    text(`発行日　${year}年${month}月${day}日`, 52, 714, 9, muted)
-    const idLabel = `請求番号　${invoice.id}`
-    right(idLabel, 543.5, 714, fit(idLabel, 8, 320), muted)
+    right(`発行日　${year}年${month}月${day}日`, 543.5, 714, 9, muted)
     line(52, 703, 543.5)
 
     text('ご請求先', 52, 690, 8, muted)
@@ -153,19 +144,6 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     recipient.forEach((s, i) => text(s, 52, 668 - i * 18, 13))
     const recipientEnd = 668 - (recipient.length - 1) * 18
     line(52, recipientEnd - 10, 320, 1.4, purple)
-    if (d.address) {
-      const address = wrap(
-        `${d.postalCode ? '〒' + d.postalCode + '　' : ''}${d.address}`,
-        font,
-        8.5,
-        268,
-      )
-      if (address.length > 2)
-        throw Error('請求先住所が長いため、短く調整してください')
-      address.forEach((s, i) =>
-        text(s, 52, recipientEnd - 25 - i * 12, 8.5, muted),
-      )
-    }
     text(d.issuer.name, 349, 675, fit(d.issuer.name, 18, 194.5), green)
     const issuerAddress = wrap(d.issuer.address, font, 8.5, 194.5)
     if (issuerAddress.length > 4)
@@ -236,9 +214,6 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     }
 
     if (last) {
-      line(52, footerTop, 320, 1, purple)
-      text('補足事項', 52, footerTop - 17, 9, purple)
-      notes.forEach((s, i) => text(s, 52, footerTop - 36 - i * 13, 9, muted))
       const totalTop = footerTop
       text('小計', 354, totalTop - 17, 9, muted)
       right(number(invoice.subtotal), 531, totalTop - 17, 11)
@@ -278,14 +253,14 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
       text(
         sections[index + 1].lines.length
           ? '明細は次ページへ続きます。'
-          : '補足事項・お振込先は次ページをご確認ください。',
+          : 'お振込先は次ページをご確認ください。',
         52,
         96,
         9,
         muted,
       )
       text(
-        '補足事項・お振込先・金額集計は最終ページに記載しています。',
+        'お振込先・金額集計は最終ページに記載しています。',
         52,
         80,
         8,

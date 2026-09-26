@@ -89,9 +89,7 @@ try {
   const pdf = await context.request.get(`${base}/api/billing/pdf/${invoice.id}`)
   expect(pdf.status()).toBe(200)
   await writeFile('.local-test/crm-billing-sample.pdf', await pdf.body())
-  await page
-    .getByLabel('補足事項（請求書に表示）', { exact: true })
-    .fill('対象期間の作業内容は月次報告書をご確認ください。')
+  await expect(page.getByLabel('補足事項（請求書に表示）', { exact: true })).toHaveCount(0)
   await page.getByLabel(/送信状態/).selectOption('draft')
   await page.getByRole('button', { name: '変更を保存', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('保存しました')
@@ -101,9 +99,6 @@ try {
   ;[invoice] =
     await sql`SELECT * FROM billing.invoices WHERE customer_id=${customer}`
   expect(invoice.document.provisional).toBe(false)
-  expect(invoice.document.notes).toBe(
-    '対象期間の作業内容は月次報告書をご確認ください。',
-  )
   await page.goto(`${base}/billing?company=${company}`)
   await expect(heading).toBeVisible()
   await page

@@ -91,7 +91,6 @@ export function InvoiceEditor({
               version: invoice.version,
               name: data.name,
               subject: data.subject,
-              notes: data.notes,
               email: data.email,
               honorific: data.honorific,
               dueDate: data.dueDate,
@@ -165,16 +164,6 @@ export function InvoiceEditor({
               onChange={(lines) => setData({ ...data, lines })}
               disabled={!editable || action.busy}
             />
-            <label>
-              補足事項（請求書に表示）
-              <textarea
-                rows={3}
-                maxLength={500}
-                value={data.notes ?? ''}
-                placeholder="補足事項がある場合に入力してください"
-                onChange={(e) => setData({ ...data, notes: e.target.value })}
-              />
-            </label>
             <div className="billing-totals">
               <span>
                 小計 <strong>{yen(subtotal)}</strong>
