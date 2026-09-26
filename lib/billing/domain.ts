@@ -76,6 +76,7 @@ export type Invoice = {
     address?: string
     postalCode?: string
     provisional?: boolean
+    notes?: string
   }
   version: number
   subtotal: number
