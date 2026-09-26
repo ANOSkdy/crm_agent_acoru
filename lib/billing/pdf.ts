@@ -27,7 +27,6 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const purple = rgb(83 / 255, 68 / 255, 145 / 255)
   const ink = rgb(0.22, 0.22, 0.26),
     muted = rgb(0.43, 0.43, 0.49)
-  const green = rgb(0.34, 0.44, 0.41)
   const pale = rgb(0.965, 0.957, 0.983),
     rule = rgb(0.84, 0.83, 0.88)
   const number = (n: number) => n.toLocaleString('ja-JP')
@@ -144,7 +143,7 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     recipient.forEach((s, i) => text(s, 52, 668 - i * 18, 13))
     const recipientEnd = 668 - (recipient.length - 1) * 18
     line(52, recipientEnd - 10, 320, 1.4, purple)
-    text(d.issuer.name, 349, 675, fit(d.issuer.name, 18, 194.5), green)
+    text(d.issuer.name, 349, 675, fit(d.issuer.name, 18, 194.5), ink)
     const issuerAddress = wrap(d.issuer.address, font, 8.5, 194.5)
     if (issuerAddress.length > 4)
       throw Error('請求元住所が長いため、短く調整してください')
