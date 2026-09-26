@@ -65,6 +65,11 @@ export function BillingWorkspace(props: Props) {
           </span>
         </div>
       )}
+      <p className="billing-toolbar">
+        <Link className="btn" href="/billing/templates">
+          請求書・見積書テンプレート →
+        </Link>
+      </p>
       <nav className="billing-tabs" aria-label="請求管理メニュー">
         {[
           ['invoices', '請求一覧'],

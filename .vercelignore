@@ -2,4 +2,5 @@
 .env*
 tests
 docs
+templates
 scripts/billing/legacy-sanitized.json

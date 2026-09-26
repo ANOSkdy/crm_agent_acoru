@@ -3,10 +3,18 @@ import fontkit from '@pdf-lib/fontkit'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Invoice } from './domain'
+import { ACORU_TEMPLATE, type DocumentOptions } from './template'
 
 let fontBytes: Promise<Buffer> | undefined
 let logoBytes: Promise<Buffer> | undefined
 export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
+  return createBusinessDocumentPdf(invoice, { kind: 'invoice' })
+}
+
+export async function createBusinessDocumentPdf(
+  invoice: Invoice,
+  options: DocumentOptions = { kind: 'invoice' },
+): Promise<Buffer> {
   const pdf = await PDFDocument.create()
   pdf.registerFontkit(fontkit)
   fontBytes ??= readFile(
@@ -20,27 +28,50 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     pdf.embedPng(await logoBytes),
   ])
   const d = invoice.document
-  pdf.setTitle(`請求書 ${d.name} ${invoice.period}`)
+  const quotation = options.kind === 'quotation'
+  pdf.setTitle(`${quotation ? '見積書' : '請求書'} ${d.name} ${invoice.period}`)
+  pdf.setSubject(`${ACORU_TEMPLATE.name} v${ACORU_TEMPLATE.version}`)
   pdf.setAuthor(d.issuer.name)
   pdf.setCreationDate(new Date(`${d.issueDate}T00:00:00Z`))
   pdf.setModificationDate(new Date(`${d.issueDate}T00:00:00Z`))
-  const purple = rgb(83 / 255, 68 / 255, 145 / 255)
-  const ink = rgb(0.22, 0.22, 0.26),
-    muted = rgb(0.43, 0.43, 0.49)
-  const pale = rgb(0.965, 0.957, 0.983),
-    rule = rgb(0.84, 0.83, 0.88)
+  const purple = rgb(...ACORU_TEMPLATE.colors.purple)
+  const ink = rgb(...ACORU_TEMPLATE.colors.ink),
+    muted = rgb(...ACORU_TEMPLATE.colors.muted)
+  const pale = rgb(...ACORU_TEMPLATE.colors.pale),
+    rule = rgb(...ACORU_TEMPLATE.colors.rule)
   const number = (n: number) => n.toLocaleString('ja-JP')
   const fit = (s: string, size: number, width: number) =>
     Math.min(size, width / Math.max(font.widthOfTextAtSize(s, 1), 1))
   const period = `${invoice.period.slice(0, 4)}年${Number(invoice.period.slice(5))}月分`
-  const bank = wrap(d.issuer.bank.trim(), font, 9, 367)
+  const quotationTerms =
+    options.kind === 'quotation'
+      ? [
+          options.delivery && `納期　${options.delivery}`,
+          options.conditions && `条件　${options.conditions}`,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : ''
+  const footerLabel = quotation
+    ? quotationTerms
+      ? 'お見積条件'
+      : 'お問い合わせ'
+    : 'お振込先'
+  const bank = wrap(
+    quotation
+      ? quotationTerms || 'ご不明な点は上記連絡先までお問い合わせください。'
+      : d.issuer.bank.trim(),
+    font,
+    9,
+    367,
+  )
   const bankY = 58,
     bankHeight = Math.max(78, 38 + bank.length * 13)
   const summaryY = bankY + bankHeight + 18
   const summaryHeight = 76
   const footerTop = summaryY + summaryHeight
   if (footerTop > 420)
-    throw Error('振込先の文章が長いため、短く調整してください')
+    throw Error(`${footerLabel}の文章が長いため、短く調整してください`)
 
   const sections: { lines: typeof d.lines; heights: number[] }[] = []
   let current: typeof d.lines = [],
@@ -78,7 +109,10 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
   }
 
   for (const [index, section] of sections.entries()) {
-    const page = pdf.addPage([595.5, 842.25])
+    const page = pdf.addPage([
+      ACORU_TEMPLATE.page.width,
+      ACORU_TEMPLATE.page.height,
+    ])
     const last = index === sections.length - 1
     const text = (
       value: string,
@@ -130,13 +164,19 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
       height: 12,
       color: purple,
     })
-    center('請 求 書', 297.75, 761, 25)
-    center('I N V O I C E', 297.75, 742, 8, purple)
+    center(quotation ? '見 積 書' : '請 求 書', 297.75, 761, 25)
+    center(
+      quotation ? 'Q U O T A T I O N' : 'I N V O I C E',
+      297.75,
+      742,
+      8,
+      purple,
+    )
     const [year, month, day] = d.issueDate.split('-').map(Number)
     right(`発行日　${year}年${month}月${day}日`, 543.5, 714, 9, muted)
     line(52, 703, 543.5)
 
-    text('ご請求先', 52, 690, 8, muted)
+    text(quotation ? 'お見積先' : 'ご請求先', 52, 690, 8, muted)
     const recipient = wrap(`${d.name}　${d.honorific}`, font, 13, 268)
     if (recipient.length > 3)
       throw Error('請求先名が長いため、短く調整してください')
@@ -156,7 +196,14 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
     if (subject.length > 2) throw Error('件名が長いため、短く調整してください')
     text('件名', 52, 572, 9, muted)
     subject.forEach((s, i) => text(s, 84, 572 - i * 15, 11))
-    text('下記の通り、ご請求申し上げます。', 52, 545, 9)
+    text(
+      quotation
+        ? '下記の通り、お見積申し上げます。'
+        : '下記の通り、ご請求申し上げます。',
+      52,
+      545,
+      9,
+    )
 
     page.drawRectangle({
       x: 52,
@@ -165,7 +212,7 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
       height: 43,
       color: pale,
     })
-    text('ご請求金額', 65, 502, 10, purple)
+    text(quotation ? 'お見積金額' : 'ご請求金額', 65, 502, 10, purple)
     const amount = `${number(invoice.total)} 円`
     right(amount, 337, 498, fit(amount, 24, 182), purple)
     text('税込', 344, 501, 8, muted)
@@ -175,8 +222,17 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
       thickness: 0.6,
       color: rule,
     })
-    text('お支払期日', 397, 513, 8, muted)
-    right(d.dueDate.replaceAll('-', '/'), 530, 496, 12, purple)
+    text(quotation ? '見積有効期限' : 'お支払期日', 397, 513, 8, muted)
+    right(
+      (options.kind === 'quotation'
+        ? options.validUntil
+        : d.dueDate
+      ).replaceAll('-', '/'),
+      530,
+      496,
+      12,
+      purple,
+    )
 
     if (section.lines.length) {
       page.drawRectangle({
@@ -208,7 +264,7 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
         line(52, y, 543.5)
       }
     } else {
-      text('請求明細は前ページをご確認ください。', 52, 459, 9, muted)
+      text('明細は前ページをご確認ください。', 52, 459, 9, muted)
     }
 
     if (last) {
@@ -238,7 +294,7 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
         height: bankHeight,
         color: purple,
       })
-      text('お振込先', 66, bankY + bankHeight - 18, 9, purple)
+      text(footerLabel, 66, bankY + bankHeight - 18, 9, purple)
       bank.forEach((s, i) => text(s, 66, bankY + bankHeight - 36 - i * 13, 9))
       page.drawImage(logo, {
         x: 474,
@@ -251,14 +307,14 @@ export async function createInvoicePdf(invoice: Invoice): Promise<Buffer> {
       text(
         sections[index + 1].lines.length
           ? '明細は次ページへ続きます。'
-          : 'お振込先は次ページをご確認ください。',
+          : `${footerLabel}は次ページをご確認ください。`,
         52,
         96,
         9,
         muted,
       )
       text(
-        'お振込先・金額集計は最終ページに記載しています。',
+        `${footerLabel}・金額集計は最終ページに記載しています。`,
         52,
         80,
         8,
