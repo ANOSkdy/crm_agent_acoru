@@ -5,7 +5,7 @@ import type { Company } from '@/lib/db/queries/companies'
 import { updateCompanyGridCellAction } from '@/lib/actions/grid-updates'
 import { Badge, statusBadgeVariant } from '@/components/ui/Badge'
 import { CrmDataGrid } from './CrmDataGrid'
-import type { GridColumn } from './gridTypes'
+import type { CrmDataGridProps, GridColumn } from './gridTypes'
 import { formatDateText } from './cellUtils'
 
 const columns: GridColumn<Company>[] = [
@@ -16,8 +16,10 @@ const columns: GridColumn<Company>[] = [
   { key: 'created_at', label: '作成日', width: 130, sortable: true, getValue: (c) => c.created_at, renderCell: (c) => formatDateText(c.created_at) },
 ]
 
-export function CompaniesGrid({ companies }: { companies: Company[] }) {
-  return <CrmDataGrid ariaLabel="顧客一覧グリッド" columns={columns} emptyMessage="顧客が見つかりません" getRowId={(row) => row.id} rows={companies} getRowDetailTitle={(row) => row.name} onSaveCell={async (row, column, value) => { const result = await updateCompanyGridCellAction(row.id, column.key as never, value); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } }} renderRowDetail={(c) => <div className="detail-list"><Detail label="会社名" value={c.name} /><Detail label="業種" value={c.industry} /><Detail label="電話番号" value={c.phone} /><Detail label="ステータス" value={c.status === 'active' ? 'アクティブ' : '非アクティブ'} /><Detail label="作成日" value={formatDateText(c.created_at)} /><div className="modal-footer"><Link href={`/companies/${c.id}`} className="button button-secondary">詳細を開く</Link><Link href={`/companies/${c.id}/edit`} className="button button-primary">編集</Link></div></div>} />
+type ToolbarProps = Pick<CrmDataGridProps<Company>, 'actions' | 'initialQuery' | 'initialFilters'>
+
+export function CompaniesGrid({ companies, ...toolbar }: { companies: Company[] } & ToolbarProps) {
+  return <CrmDataGrid {...toolbar} title="顧客" ariaLabel="顧客一覧グリッド" columns={columns} emptyMessage="顧客が見つかりません" getRowId={(row) => row.id} rows={companies} getRowDetailTitle={(row) => row.name} onSaveCell={async (row, column, value) => { const result = await updateCompanyGridCellAction(row.id, column.key as never, value); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } }} renderRowDetail={(c) => <div className="detail-list"><Detail label="会社名" value={c.name} /><Detail label="業種" value={c.industry} /><Detail label="電話番号" value={c.phone} /><Detail label="ステータス" value={c.status === 'active' ? 'アクティブ' : '非アクティブ'} /><Detail label="作成日" value={formatDateText(c.created_at)} /><div className="modal-footer"><Link href={`/companies/${c.id}`} className="button button-secondary">詳細を開く</Link><Link href={`/companies/${c.id}/edit`} className="button button-primary">編集</Link></div></div>} />
 }
 
 function Detail({ label, value }: { label: string; value: string | null | undefined }) { return <div className="detail-list__row"><dt className="detail-list__label">{label}</dt><dd className="detail-list__value">{value || '-'}</dd></div> }

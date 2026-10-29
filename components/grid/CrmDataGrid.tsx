@@ -21,8 +21,19 @@ export function CrmDataGrid<Row>({
   onSaveCell,
   renderRowDetail,
   getRowDetailTitle,
+  title,
+  actions,
+  toolbar,
+  initialQuery = '',
+  initialFilters,
+  summary,
 }: CrmDataGridProps<Row>) {
   const [localRows, setLocalRows] = useState(rows)
+  const [sourceRows, setSourceRows] = useState(rows)
+  if (sourceRows !== rows) { setSourceRows(rows); setLocalRows(rows) }
+  const [query, setQuery] = useState(initialQuery)
+  const [filters, setFilters] = useState<Record<string, string>>(() => ({ ...initialFilters }))
+  const [showFilters, setShowFilters] = useState(() => Object.values(initialFilters ?? {}).some(Boolean))
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [sort, setSort] = useState<SortState | null>(null)
   const [focusedCell, setFocusedCell] = useState<CellRef | null>(null)
@@ -33,12 +44,34 @@ export function CrmDataGrid<Row>({
 
 
   const dataColumns = useMemo(() => columns.filter((column) => column.key !== 'actions'), [columns])
+  const filterOptions = useMemo(() => Object.fromEntries(dataColumns.map((column) => {
+    if (column.options) return [column.key, column.options]
+    if (filterKind(column) !== 'select') return [column.key, []]
+    const values = [...new Set(localRows.map((row) => column.getValue?.(row)).filter((value) => value != null && value !== '').map(String))]
+    return [column.key, values.sort((a, b) => a.localeCompare(b, 'ja')).map((value) => ({ value, label: value }))]
+  })), [dataColumns, localRows])
+  const activeFilterCount = Object.values(filters).filter(Boolean).length
+  const filteredRows = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase()
+    return localRows.filter((row) => {
+      if (needle && !dataColumns.some((column) => cellSearchText(row, column).includes(needle))) return false
+      return dataColumns.every((column) => {
+        const filter = filters[column.key]
+        if (!filter) return true
+        const value = column.getValue?.(row)
+        if (filterKind(column) === 'select') return String(value ?? '') === filter
+        return matchesTextFilter(value, cellSearchText(row, column), filter)
+      })
+    })
+  }, [dataColumns, filters, localRows, query])
   const sortedRows = useMemo(() => {
-    if (!sort) return localRows
+    if (!sort) return filteredRows
     const column = columns.find((c) => c.key === sort.key)
-    if (!column?.getValue) return localRows
-    return [...localRows].sort((a, b) => compareGridValues(column.getValue?.(a), column.getValue?.(b), sort.direction))
-  }, [columns, localRows, sort])
+    if (!column?.getValue) return filteredRows
+    return [...filteredRows].sort((a, b) => compareGridValues(column.getValue?.(a), column.getValue?.(b), sort.direction))
+  }, [columns, filteredRows, sort])
+  const selectedRows = sortedRows.filter((row) => selectedIds.has(getRowId(row)))
+  const aggregateRows = selectedRows.length > 0 ? selectedRows : sortedRows
 
   const allVisibleSelected = sortedRows.length > 0 && sortedRows.every((row) => selectedIds.has(getRowId(row)))
   const statusKey = (rowId: string, columnKey: string) => `${rowId}:${columnKey}`
@@ -177,17 +210,72 @@ export function CrmDataGrid<Row>({
     return <input {...common} type={type} value={String(editor.draftValue ?? '')} onChange={(event) => setEditingCell({ ...editor, draftValue: event.target.value })} />
   }
 
+  const setFilter = (key: string, value: string) => setFilters((current) => ({ ...current, [key]: value }))
+  const clearFilters = () => { setFilters({}); setQuery('') }
+  const hasToolbar = title != null || actions != null || toolbar != null
+
   return (
     <section className="crm-grid" aria-label={ariaLabel} tabIndex={0} onKeyDown={onGridKeyDown} onPaste={(event) => { if (!['INPUT', 'SELECT', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) { event.preventDefault(); void pasteTsv(event.clipboardData.getData('text/plain')) } }}>
+      {hasToolbar ? <div className="crm-grid__toolbar">
+        {title != null ? <h1 className="workspace__title">{title}</h1> : null}
+        <label className="crm-grid__search">
+          <svg aria-hidden="true" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="7" cy="7" r="5" /><path d="m11 11 3.5 3.5" strokeLinecap="round" /></svg>
+          <input type="search" aria-label="表の内容を検索" placeholder="すべての列から検索" value={query} onChange={(event) => setQuery(event.target.value)} />
+        </label>
+        <button type="button" className="crm-grid__tool" aria-pressed={showFilters} onClick={() => setShowFilters((current) => !current)}>
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 2h13l-5 6.2V13l-3 1.5V8.2z" /></svg>
+          列フィルター{activeFilterCount > 0 ? <span className="crm-grid__tool-count">{activeFilterCount}</span> : null}
+        </button>
+        {activeFilterCount > 0 || query ? <button type="button" className="crm-grid__clear" onClick={clearFilters}>条件をクリア</button> : null}
+        {toolbar}
+        <span className="workspace__spacer" />
+        {actions != null ? <div className="workspace__actions">{actions}</div> : null}
+      </div> : null}
       <div className="crm-grid__scroller">
         <table className="crm-grid__table">
           <colgroup><col style={{ width: 48 }} /><col style={{ width: 42 }} />{columns.map((column) => <col key={column.key} style={{ width: column.width, minWidth: column.minWidth }} />)}</colgroup>
-          <thead className="crm-grid__head"><tr><th className="crm-grid__header crm-grid__header--select" scope="col"><input aria-label="表示中の行をすべて選択" checked={allVisibleSelected} disabled={sortedRows.length === 0} type="checkbox" onChange={toggleAll} /></th><th className="crm-grid__header crm-grid__header--rownum" scope="col">#</th>{columns.map((column) => { const isSorted = sort?.key === column.key; return <th key={column.key} className={`crm-grid__header crm-grid__header--${column.align ?? 'left'}`} scope="col">{column.sortable ? <button className="crm-grid__sort" type="button" onClick={() => toggleSort(column.key)}><span>{column.label}</span><span aria-hidden="true" className="crm-grid__sort-icon">{isSorted ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button> : column.label}</th> })}</tr></thead>
-          <tbody>{sortedRows.length === 0 ? <tr><td className="crm-grid__empty" colSpan={columns.length + 2}>{emptyMessage}</td></tr> : sortedRows.map((row, index) => { const rowId = getRowId(row); const selected = selectedIds.has(rowId); return <tr key={rowId} className={`crm-grid__row ${selected ? 'crm-grid__row--selected' : ''} ${getRowClassName?.(row) ?? ''}`} aria-selected={selected} onClick={(event) => { if (!renderRowDetail || (event.target as HTMLElement).closest(interactiveSelector)) return; if (clickTimer.current) clearTimeout(clickTimer.current); clickTimer.current = setTimeout(() => setDetailRow(row), 180) }}><td className="crm-grid__cell crm-grid__cell--select"><input aria-label={`${index + 1}行目を選択`} checked={selected} type="checkbox" onChange={() => toggleRow(rowId)} /></td><td className="crm-grid__cell crm-grid__cell--rownum">{index + 1}</td>{columns.map((column) => { const isFocused = focusedCell?.rowId === rowId && focusedCell.columnKey === column.key; const isEditing = editingCell?.rowId === rowId && editingCell.columnKey === column.key; const cellStatus = cellStatuses[statusKey(rowId, column.key)]; return <td key={column.key} tabIndex={isFocused ? 0 : -1} className={`crm-grid__cell crm-grid__cell--${column.align ?? 'left'} ${column.editable ? 'crm-grid__cell--editable' : ''} ${isFocused ? 'crm-grid__cell--focused' : ''} ${isEditing ? 'crm-grid__cell--editing' : ''} ${cellStatus?.status ? `crm-grid__cell--${cellStatus.status}` : ''}`} onClick={(event) => { event.stopPropagation(); setFocusedCell({ rowId, columnKey: column.key }) }} onDoubleClick={(event) => { event.stopPropagation(); if (clickTimer.current) clearTimeout(clickTimer.current); startEditing(row, column) }}>{isEditing ? <span className="crm-grid__editor">{renderEditor(row, column, editingCell)}</span> : (column.renderCell ? column.renderCell(row) : (column.getValue?.(row) ?? '-'))}{cellStatus?.status === 'saving' ? <span className="crm-grid__cell-status">保存中</span> : null}{cellStatus?.status === 'saved' ? <span className="crm-grid__cell-status">保存済み</span> : null}{cellStatus?.status === 'error' ? <span className="crm-grid__cell-error" role="alert">⚠ {cellStatus.error}</span> : null}</td> })}</tr> })}</tbody>
+          <thead className="crm-grid__head"><tr><th className="crm-grid__header crm-grid__header--select" scope="col"><input aria-label="表示中の行をすべて選択" checked={allVisibleSelected} disabled={sortedRows.length === 0} type="checkbox" onChange={toggleAll} /></th><th className="crm-grid__header crm-grid__header--rownum" scope="col">#</th>{columns.map((column) => { const isSorted = sort?.key === column.key; return <th key={column.key} className={`crm-grid__header crm-grid__header--${column.align ?? 'left'}`} scope="col">{column.sortable ? <button className={`crm-grid__sort${isSorted ? ' crm-grid__sort--active' : ''}`} type="button" onClick={() => toggleSort(column.key)}><span>{column.label}</span><span aria-hidden="true" className="crm-grid__sort-icon">{isSorted ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button> : column.label}</th> })}</tr>{showFilters ? <tr><td className="crm-grid__filter-cell" /><td className="crm-grid__filter-cell" />{columns.map((column) => { const kind = column.key === 'actions' ? false : filterKind(column); const value = filters[column.key] ?? ''; const className = `crm-grid__filter-input${value ? ' crm-grid__filter-input--active' : ''}`; return <td key={column.key} className="crm-grid__filter-cell">{kind === 'select' ? <select aria-label={`${column.label}で絞り込み`} className={className} value={value} onChange={(event) => setFilter(column.key, event.target.value)}><option value="">すべて</option>{filterOptions[column.key]?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : kind === 'text' ? <input aria-label={`${column.label}で絞り込み`} className={className} value={value} placeholder={column.align === 'right' ? '例: >1000' : '含む…'} onChange={(event) => setFilter(column.key, event.target.value)} /> : null}</td> })}</tr> : null}</thead>
+          <tbody>{sortedRows.length === 0 ? <tr><td className="crm-grid__empty" colSpan={columns.length + 2}>{emptyMessage}</td></tr> : sortedRows.map((row, index) => { const rowId = getRowId(row); const selected = selectedIds.has(rowId); return <tr key={rowId} className={`crm-grid__row ${selected ? 'crm-grid__row--selected' : ''} ${getRowClassName?.(row) ?? ''}`} aria-selected={selected} onClick={(event) => { if (!renderRowDetail || (event.target as HTMLElement).closest(interactiveSelector)) return; if (clickTimer.current) clearTimeout(clickTimer.current); clickTimer.current = setTimeout(() => setDetailRow(row), 180) }}><td className="crm-grid__cell crm-grid__cell--select"><input aria-label={`${index + 1}行目を選択`} checked={selected} type="checkbox" onChange={() => toggleRow(rowId)} /></td><td className="crm-grid__cell crm-grid__cell--rownum">{index + 1}</td>{columns.map((column) => { const isFocused = focusedCell?.rowId === rowId && focusedCell.columnKey === column.key; const isEditing = editingCell?.rowId === rowId && editingCell.columnKey === column.key; const cellStatus = cellStatuses[statusKey(rowId, column.key)]; return <td key={column.key} tabIndex={isFocused ? 0 : -1} className={`crm-grid__cell crm-grid__cell--${column.align ?? 'left'} ${column.editable ? 'crm-grid__cell--editable' : ''} ${isFocused ? 'crm-grid__cell--focused' : ''} ${isEditing ? 'crm-grid__cell--editing' : ''} ${cellStatus?.status ? `crm-grid__cell--${cellStatus.status}` : ''}`} onClick={(event) => { event.stopPropagation(); setFocusedCell({ rowId, columnKey: column.key }) }} onDoubleClick={(event) => { event.stopPropagation(); if (clickTimer.current) clearTimeout(clickTimer.current); startEditing(row, column) }}>{isEditing ? <span className="crm-grid__editor">{renderEditor(row, column, editingCell)}</span> : (column.renderCell ? column.renderCell(row) : (column.options?.find((option) => option.value === String(column.getValue?.(row)))?.label ?? column.getValue?.(row) ?? '-'))}{cellStatus?.status === 'saving' ? <span className="crm-grid__cell-status">保存中</span> : null}{cellStatus?.status === 'saved' ? <span className="crm-grid__cell-status">保存済み</span> : null}{cellStatus?.status === 'error' ? <span className="crm-grid__cell-error" role="alert">⚠ {cellStatus.error}</span> : null}</td> })}</tr> })}</tbody>
         </table>
       </div>
-      <div className="crm-grid__status" role="status"><span>{localRows.length.toLocaleString()} 件</span><span>{selectedIds.size.toLocaleString()} 件選択中</span></div>
+      <div className="crm-grid__status" role="status">
+        <span>{sortedRows.length === localRows.length ? <><strong>{localRows.length.toLocaleString()}</strong> 件</> : <>表示 <strong>{sortedRows.length.toLocaleString()}</strong> / 全 {localRows.length.toLocaleString()} 件</>}</span>
+        <span>{selectedIds.size.toLocaleString()} 件選択中</span>
+        <span className="crm-grid__status-spacer" />
+        {dataColumns.filter((column) => column.aggregate === 'sum').map((column) => {
+          const total = aggregateRows.reduce((sum, row) => sum + (Number(column.getValue?.(row)) || 0), 0)
+          return <span key={column.key}>{column.label} 合計 <strong>{column.formatAggregate ? column.formatAggregate(total) : total.toLocaleString()}</strong></span>
+        })}
+        {summary?.(aggregateRows)}
+      </div>
       {detailRow && renderRowDetail ? <Modal title={getRowDetailTitle?.(detailRow) ?? '詳細'} onClose={() => setDetailRow(null)}>{renderRowDetail(detailRow)}</Modal> : null}
     </section>
   )
+}
+
+function filterKind<Row>(column: GridColumn<Row>) {
+  if (column.filter === false || !column.getValue) return false
+  return column.filter ?? (column.options ? 'select' : 'text')
+}
+
+function cellSearchText<Row>(row: Row, column: GridColumn<Row>) {
+  const value = column.getValue?.(row)
+  if (value == null) return ''
+  const label = column.options?.find((option) => option.value === String(value))?.label
+  return `${value} ${label ?? ''}`.toLocaleLowerCase()
+}
+
+// Excel-like text filter: "contains" by default, or a numeric comparison such as ">=1000".
+function matchesTextFilter(value: unknown, text: string, filter: string) {
+  const comparison = filter.trim().match(/^(>=|<=|>|<|=)\s*(-?[\d,.]+)$/)
+  if (comparison && value != null && value !== '' && !Number.isNaN(Number(value))) {
+    const actual = Number(value)
+    const expected = Number(comparison[2].replace(/,/g, ''))
+    if (comparison[1] === '>=') return actual >= expected
+    if (comparison[1] === '<=') return actual <= expected
+    if (comparison[1] === '>') return actual > expected
+    if (comparison[1] === '<') return actual < expected
+    return actual === expected
+  }
+  return text.includes(filter.trim().toLocaleLowerCase())
 }

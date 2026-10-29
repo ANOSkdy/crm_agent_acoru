@@ -7,10 +7,8 @@ export default async function ContactsPage() {
   const contacts = await getContacts()
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">担当者一覧</h1>
+    <div className="workspace">
       <ContactsGrid contacts={contacts} />
-
     </div>
   )
 }

@@ -17,6 +17,7 @@ Acoru CRM のデザイン基準です。画面追加・改修時はこのファ�
 - Surface: `--color-surface`
 - Text: `--color-text`, `--color-text-sub`, `--color-text-faint`
 - Primary: `--color-primary`, `--color-primary-hover`, `--color-primary-soft`
+- Ink / accent: `--color-ink`, `--color-gold`, `--color-gold-soft`
 - Borders: `--color-border`, `--color-border-strong`
 - Radius: `--radius-btn`, `--radius-input`, `--radius-menu`, `--radius-modal`
 - Motion: `--dur-menu`, `--ease-out`
@@ -30,9 +31,17 @@ Acoru CRM のデザイン基準です。画面追加・改修時はこのファ�
 - 入力欄は `.input`、送信ボタンは `.btn.btn--primary` を使う。
 - エラーは danger トークンを使い、`role="alert"` を付与する。
 
-## Navigation
+## Layout
 
-ログイン後のサイドナビゲーションは、主要機能リンクを上部、セッション操作を下部に配置します。
+- サイドバーは使わない。上部の 46px トップバー（ブランド・横並びナビ・ユーザー・ログアウト）以外はすべてコンテンツに使う。
+- 900px 未満ではナビを「ナビゲーションを展開」ボタンのメニューに畳む。
+- 一覧画面は `.workspace` + `CrmDataGrid`（`title` / `actions` を渡す）で、ツールバー・グリッド・ステータスバーを画面高いっぱいに表示する。
+- 絞り込みはグリッド内で行う：全列検索、列フィルター行（選択肢列はセレクト、数値列は `>1000` などの比較）、ステータスバーに件数と `aggregate: 'sum'` 列の合計。
+- 課題管理・請求管理・一斉メールも同じ構成（ページバー → シートタブ → 本文）。シートタブは `.sheet-tab`、表は `.data-table` かグリッドと同じ見た目にする。
 
-- 「ログアウト」はナビゲーション最下部に固定する。
-- 折りたたみ時も操作可能なアイコンボタンとして残す。
+## Visual tone
+
+- インクネイビー（`--color-ink` / `--color-primary`）を基調に、シャンパンゴールド（`--color-gold`）はアクティブ状態・フォーカス・アクセントのみに使う。
+- 背景はウォームニュートラル（`--color-bg`）、面は白。影は `--shadow-card` 程度に抑える。
+- 数値は `font-variant-numeric: tabular-nums` で右揃え。
+- Tailwind の gray / blue / red / green パレットは `globals.css` の `@theme` でブランド色に再マップ済み。新規画面では Tailwind の色指定より既存クラスを優先する。

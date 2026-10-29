@@ -15,11 +15,13 @@ export default async function EditPage({ params }: { params: Promise<{ taskId: s
   if (!task) notFound()
   await requireTaskWrite(taskId)
   const companies = await getCompanies()
-  return <div className="p-4 sm:p-6 max-w-3xl space-y-5">
-    <h1 className="text-2xl font-bold">課題編集: No {task.issue_number}</h1>
+  return <div className="workspace">
+    <div className="workspace__bar"><h1 className="workspace__title">課題編集: No {task.issue_number}</h1></div>
+    <div className="workspace__body workspace__body--padded"><div className="page-narrow">
     <SourceLinks type="task" id={task.id} />
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
+    <div className="panel panel__body">
       <TaskForm task={task} companies={companies.map(c => ({ id: c.id, name: c.name }))} today={toDateInputValue(new Date())} />
     </div>
+    </div></div>
   </div>
 }

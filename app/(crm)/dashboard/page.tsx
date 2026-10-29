@@ -1,69 +1,70 @@
 export const dynamic = 'force-dynamic'
 
 import { getDashboardData } from '@/lib/db/queries/dashboard'
-import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import Link from 'next/link'
-
 
 export default async function DashboardPage() {
   const data = await getDashboardData()
+  const pipelineTotal = data.stageStats.reduce((sum, s) => sum + Number(s.total_amount), 0)
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardBody>
-            <p className="text-sm text-gray-500">本日の課題</p>
-            <p className="text-3xl font-bold text-blue-600">{data.todayTasks}</p>
-            <Link href="/tasks" className="text-xs text-blue-500 hover:underline">課題一覧 →</Link>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-sm text-gray-500">期限切れ課題</p>
-            <p className="text-3xl font-bold text-red-600">{data.overdueTasks}</p>
-            <Link href="/tasks" className="text-xs text-red-500 hover:underline">確認する →</Link>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-sm text-gray-500">進行中の案件</p>
-            <p className="text-3xl font-bold text-green-600">{data.openDeals}</p>
-            <Link href="/deals" className="text-xs text-green-500 hover:underline">案件一覧 →</Link>
-          </CardBody>
-        </Card>
+    <div className="workspace">
+      <div className="workspace__bar">
+        <h1 className="workspace__title">ダッシュボード</h1>
+        <span className="workspace__meta">今日の状況</span>
       </div>
+      <div className="workspace__body workspace__body--padded">
+        <div className="dashboard">
+          <div className="kpi-strip">
+            <div className="kpi">
+              <span className="kpi__label">本日の課題</span>
+              <span className="kpi__value">{data.todayTasks}</span>
+              <Link href="/tasks" className="kpi__link">課題一覧 →</Link>
+            </div>
+            <div className="kpi">
+              <span className="kpi__label">期限切れ課題</span>
+              <span className={`kpi__value${data.overdueTasks > 0 ? ' kpi__value--danger' : ''}`}>{data.overdueTasks}</span>
+              <Link href="/tasks" className="kpi__link">確認する →</Link>
+            </div>
+            <div className="kpi">
+              <span className="kpi__label">進行中の案件</span>
+              <span className="kpi__value">{data.openDeals}</span>
+              <Link href="/deals?status=open" className="kpi__link">案件一覧 →</Link>
+            </div>
+            <div className="kpi">
+              <span className="kpi__label">パイプライン金額</span>
+              <span className="kpi__value">¥{pipelineTotal.toLocaleString()}</span>
+              <span className="kpi__note">全ステージ合計</span>
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Stage Stats */}
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-gray-900">パイプライン</h2>
-          </CardHeader>
-          <CardBody className="p-0">
-            <table className="w-full text-sm">
+          <section className="panel">
+            <div className="panel__head"><h2 className="panel__title">パイプライン</h2></div>
+            <table className="data-table">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-6 py-2 text-xs font-medium text-gray-500">営業ステージ</th>
-                  <th className="px-6 py-2 text-xs font-medium text-gray-500 text-right">案件件数</th>
-                  <th className="px-6 py-2 text-xs font-medium text-gray-500 text-right">案件金額合計（円）</th>
+                <tr>
+                  <th>営業ステージ</th>
+                  <th className="num">案件件数</th>
+                  <th className="num">案件金額合計（円）</th>
+                  <th>構成比</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.stageStats.map((s) => (
-                  <tr key={s.stage_name}>
-                    <td className="px-6 py-2 text-gray-900">{s.stage_name}</td>
-                    <td className="px-6 py-2 text-right text-gray-700">{Number(s.deal_count)}</td>
-                    <td className="px-6 py-2 text-right text-gray-700">¥{Number(s.total_amount).toLocaleString()}</td>
-                  </tr>
-                ))}
+              <tbody>
+                {data.stageStats.map((s) => {
+                  const share = pipelineTotal > 0 ? Number(s.total_amount) / pipelineTotal : 0
+                  return (
+                    <tr key={s.stage_name}>
+                      <td>{s.stage_name}</td>
+                      <td className="num">{Number(s.deal_count)}</td>
+                      <td className="num">¥{Number(s.total_amount).toLocaleString()}</td>
+                      <td><span className="share-bar"><span style={{ width: `${Math.round(share * 100)}%` }} /></span></td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
-          </CardBody>
-        </Card>
+          </section>
+        </div>
       </div>
     </div>
   )
