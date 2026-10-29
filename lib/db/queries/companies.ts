@@ -91,6 +91,7 @@ export async function createCompany(data: {
   status?: string
   source?: string | null
   memo?: string | null
+  created_by?: string
 }): Promise<Company> {
   const corporateNumber = normalizeCorporateNumber(data.corporate_number)
   const industry = emptyToNull(data.industry)
@@ -102,7 +103,7 @@ export async function createCompany(data: {
   const memo = emptyToNull(data.memo)
 
   const rows = await sql`
-    INSERT INTO companies (name, corporate_number, industry, website_url, postal_code, address, phone, status, source, memo)
+    INSERT INTO companies (name, corporate_number, industry, website_url, postal_code, address, phone, status, source, memo, created_by)
     VALUES (
       ${data.name},
       ${corporateNumber},
@@ -113,7 +114,8 @@ export async function createCompany(data: {
       ${phone},
       ${data.status ?? 'active'},
       ${source},
-      ${memo}
+      ${memo},
+      ${data.created_by ?? null}
     )
     RETURNING *
   `

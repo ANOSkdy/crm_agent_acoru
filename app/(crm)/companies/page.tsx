@@ -25,7 +25,7 @@ export default async function CompaniesPage({ searchParams }: Props) {
           </a>
           <Link
             href="/companies/new"
-            className="inline-flex items-center px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="inline-flex items-center px-4 py-2 text-sm btn--primary rounded-md"
           >
             + 新規顧客
           </Link>

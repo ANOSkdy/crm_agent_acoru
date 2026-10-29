@@ -1,75 +1,83 @@
 'use server'
-
 import { redirect } from 'next/navigation'
 import { sql } from '@/lib/db'
-import { verifyPassword } from '@/lib/auth/password'
-import { createUserSession, getCurrentUser, revokeCurrentSession } from '@/lib/auth/session'
-import { getUserByLoginId, markLoginFailure, markLoginSuccess } from '@/lib/db/queries/users'
-import { LOGIN_ERROR_MESSAGE, LOCKED_ERROR_MESSAGE, loginSchema } from '@/lib/validation/auth'
+import {
+  createSessionToken,
+  hashSessionToken,
+  setSessionCookie,
+  getCurrentUser,
+  revokeCurrentSession,
+} from '@/lib/auth/session'
+import { loginRequest, mfaRepository } from '@/lib/auth/mfa'
+import {
+  decryptSecret,
+  otpUserId,
+  safeReturnTo,
+  verifyCode,
+} from '@/lib/auth/mfa-crypto'
 
-export type LoginActionState = {
-  error?: string
-}
-
-async function insertAuditLog(action: string, userId?: string, metadata?: Record<string, unknown>) {
-  await sql`
-    INSERT INTO audit_logs (user_id, action, target_type, after_json)
-    VALUES (${userId ?? null}, ${action}, 'auth', ${metadata ? JSON.stringify(metadata) : null})
-  `
-}
-
-export async function loginAction(
-  _previousState: LoginActionState,
+export type LoginActionState = { error?: string }
+export async function verifyOtpAction(
+  _state: LoginActionState,
   formData: FormData,
 ): Promise<LoginActionState> {
-  const parsed = loginSchema.safeParse({
-    login_id: formData.get('login_id'),
-    password: formData.get('password'),
-  })
-
-  if (!parsed.success) {
-    return { error: LOGIN_ERROR_MESSAGE }
+  let returnTo = '/dashboard'
+  try {
+    const request = await loginRequest()
+    const repo = mfaRepository()
+    const userId = otpUserId()
+    if (
+      !(await repo.rateLimit('otp-only-ip', request.ip, 10, 300)) ||
+      !(await repo.rateLimit('otp-only-user', userId, 10, 300))
+    )
+      return {
+        error:
+          '試行回数の上限に達しました。5分ほど待ってから再度お試しください。',
+      }
+    const credential = await repo.otpCredential(userId)
+    if (!credential)
+      return {
+        error:
+          'OTPが未登録か、現在ログインできません。管理者にご確認ください。',
+      }
+    const secret = decryptSecret(
+      credential.secret_encrypted,
+      `${repo.environment}:${userId}`,
+    )
+    const step = verifyCode(secret, formData.get('code'))
+    if (step === null)
+      return {
+        error:
+          '認証できませんでした。1Passwordの最新の6桁コードをご確認ください。',
+      }
+    const token = createSessionToken()
+    if (
+      !(await repo.completeOtp(
+        userId,
+        credential.version,
+        step,
+        hashSessionToken(token),
+        request.userAgent,
+        request.ip,
+      ))
+    )
+      return {
+        error: 'このコードは使用済みです。新しいコードで再度お試しください。',
+      }
+    await setSessionCookie(token)
+    returnTo = safeReturnTo(formData.get('next'))
+  } catch {
+    return {
+      error:
+        '現在認証できません。時間をおいて再度お試しいただくか、管理者にご確認ください。',
+    }
   }
-
-  const { login_id: loginId, password } = parsed.data
-  const user = await getUserByLoginId(loginId)
-
-  if (!user) {
-    await insertAuditLog('login_failed', undefined, { login_id: loginId })
-    return { error: LOGIN_ERROR_MESSAGE }
-  }
-
-  if (!user.is_active) {
-    await insertAuditLog('login_failed', user.id, { reason: 'inactive' })
-    return { error: LOGIN_ERROR_MESSAGE }
-  }
-
-  if (user.locked_until && new Date(user.locked_until) > new Date()) {
-    await insertAuditLog('login_failed', user.id, { reason: 'locked' })
-    return { error: LOCKED_ERROR_MESSAGE }
-  }
-
-  const verified = await verifyPassword(password, user.password_hash)
-  if (!verified) {
-    await markLoginFailure(user.id)
-    await insertAuditLog('login_failed', user.id)
-    return { error: LOGIN_ERROR_MESSAGE }
-  }
-
-  await markLoginSuccess(user.id)
-  await createUserSession(user.id)
-  await insertAuditLog('login_success', user.id)
-
-  redirect('/dashboard')
+  redirect(returnTo)
 }
-
 export async function logoutAction() {
   const user = await getCurrentUser()
-  await revokeCurrentSession()
-
-  if (user) {
-    await insertAuditLog('logout', user.id)
-  }
-
+  const localSession = await revokeCurrentSession()
+  if (user && !localSession)
+    await sql`INSERT INTO audit_logs(user_id,action,target_type) VALUES (${user.id},'logout','auth')`
   redirect('/login')
 }

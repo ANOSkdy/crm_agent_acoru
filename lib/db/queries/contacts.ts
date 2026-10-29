@@ -64,9 +64,10 @@ export async function createContact(data: {
   phone?: string
   is_decision_maker?: boolean
   memo?: string
+  created_by?: string
 }): Promise<Contact> {
   const rows = await sql`
-    INSERT INTO contacts (company_id, name, department, position, email, phone, is_decision_maker, memo)
+    INSERT INTO contacts (company_id, name, department, position, email, phone, is_decision_maker, memo, created_by)
     VALUES (
       ${data.company_id},
       ${data.name},
@@ -75,7 +76,8 @@ export async function createContact(data: {
       ${data.email ?? null},
       ${data.phone ?? null},
       ${data.is_decision_maker ?? false},
-      ${data.memo ?? null}
+      ${data.memo ?? null},
+      ${data.created_by ?? null}
     )
     RETURNING *
   `

@@ -1,30 +1,44 @@
 'use client'
-
 import Link from 'next/link'
-import type { Task } from '@/lib/db/queries/tasks'
-import { completeTaskAction, deleteTaskAction } from '@/lib/actions/tasks'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { updateTaskGridCellAction } from '@/lib/actions/grid-updates'
-import { CrmDataGrid } from './CrmDataGrid'
-import type { GridColumn } from './gridTypes'
-import { formatDateText } from './cellUtils'
+import type { Task } from '@/lib/db/queries/tasks'
+import { taskStatusLabels } from '@/lib/validation/task'
+import { formatDisplayDate } from '@/lib/utils/date'
 
-const priorityLabels: Record<string, string> = { high: '高', medium: '中', low: '低' }
-
-const columns: GridColumn<Task>[] = [
-  { key: 'title', label: 'タイトル', width: 240, sortable: true, editable: true, editor: 'text', getValue: (t) => t.title, renderCell: (t) => <span className={`crm-grid__strong ${t.status === 'done' ? 'crm-grid__text-done' : ''}`}>{t.title}</span> },
-  { key: 'company', label: '会社', width: 180, sortable: true, getValue: (t) => t.company_name, renderCell: (t) => t.company_id ? <Link href={`/companies/${t.company_id}`} className="crm-grid__link">{t.company_name ?? '-'}</Link> : '-' },
-  { key: 'priority', label: '優先度', width: 100, sortable: true, editable: true, editor: 'select', options: [{ value: 'high', label: '高' }, { value: 'medium', label: '中' }, { value: 'low', label: '低' }], getValue: (t) => t.priority, renderCell: (t) => <span className={`crm-grid__priority crm-grid__priority--${t.priority}`}>{priorityLabels[t.priority] ?? t.priority}</span> },
-  { key: 'due_date', label: '期限', width: 130, sortable: true, editable: true, editor: 'date', getValue: (t) => t.due_date, renderCell: (t) => <span>{formatDateText(t.due_date)}{isOverdue(t) ? ' ⚠' : ''}</span> },
-  { key: 'status', label: 'ステータス', width: 110, sortable: true, editable: true, editor: 'select', options: [{ value: 'open', label: '未完' }, { value: 'done', label: '完了' }], getValue: (t) => t.status, renderCell: (t) => t.status === 'done' ? '完了' : '未完' },
-  { key: 'actions', label: '操作', width: 170, renderCell: (t) => <span className="crm-grid__actions"><Link href={`/tasks/${t.id}/edit`} className="crm-grid__action-link">編集</Link>{t.status === 'open' && <form action={completeTaskAction.bind(null, t.id)}><button type="submit" className="crm-grid__action-link crm-grid__action-link--success">完了</button></form>}<form action={deleteTaskAction.bind(null, t.id, undefined)}><button type="submit" className="crm-grid__action-link crm-grid__action-link--danger">削除</button></form></span> },
-]
-
-function isOverdue(task: Task): boolean {
-  return Boolean(task.due_date && task.status === 'open' && new Date(task.due_date) < new Date())
+function StatusCell({ task, editable }: { task: Task; editable: boolean }) {
+  const [error, setError] = useState('')
+  const [pending, startTransition] = useTransition()
+  const router = useRouter()
+  if (!editable) return <span>{taskStatusLabels[task.status]}</span>
+  return <><select aria-label={`No ${task.issue_number} の状態`} className="select min-w-28" value={task.status} disabled={pending} onChange={event => {
+    const value = event.target.value
+    setError('')
+    startTransition(async () => {
+      const result = await updateTaskGridCellAction(task.id, 'status', value)
+      if (!result.ok) setError(result.error)
+      else router.refresh()
+    })
+  }}>{Object.entries(taskStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{error && <p role="alert" className="text-xs text-red-700 mt-2">{error}</p>}</>
 }
-
-export function TasksGrid({ tasks }: { tasks: Task[] }) {
-  return <CrmDataGrid ariaLabel="タスク一覧グリッド" columns={columns} emptyMessage="タスクがありません" getRowClassName={(row) => isOverdue(row) ? 'crm-grid__row--overdue' : undefined} getRowId={(row) => row.id} rows={tasks} getRowDetailTitle={(row) => row.title} onSaveCell={async (row, column, value) => { const result = await updateTaskGridCellAction(row.id, column.key as never, value); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } }} renderRowDetail={(t) => <div className="detail-list"><Detail label="タイトル" value={t.title} /><Detail label="会社" value={t.company_name} /><Detail label="優先度" value={priorityLabels[t.priority] ?? t.priority} /><Detail label="期限" value={formatDateText(t.due_date)} /><Detail label="ステータス" value={t.status === 'done' ? '完了' : '未完'} /><div className="modal-footer"><Link href={`/tasks/${t.id}/edit`} className="button button-primary">編集</Link></div></div>} />
+export function TasksGrid({ tasks, editableIds = [], today }: { tasks: Task[]; editableIds?: string[]; today: string }) {
+  return <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white" role="region" aria-label="課題一覧" tabIndex={0}>
+    <table className="w-full min-w-[1000px] text-sm text-left">
+      <thead className="bg-gray-50 text-gray-600"><tr>{['No', '起票日', '内容', '完了条件', '期限', '進捗', '状態'].map(label => <th key={label} scope="col" className="px-4 py-3 whitespace-nowrap">{label}</th>)}</tr></thead>
+      <tbody className="divide-y divide-gray-100">{tasks.map(task => {
+        const editable = editableIds.includes(task.id)
+        const overdue = !!task.due_date && ['open', 'in_progress'].includes(task.status) && task.due_date.slice(0, 10) < today
+        return <tr key={task.id} className={overdue ? 'bg-red-50' : undefined}>
+          <td className="px-4 py-3 tabular-nums">{editable ? <Link href={`/tasks/${task.id}/edit`} aria-label={`課題 No ${task.issue_number} を編集`} className="text-blue-600 underline">{task.issue_number}</Link> : task.issue_number}</td>
+          <td className="px-4 py-3 whitespace-nowrap">{formatDisplayDate(task.opened_on)}</td>
+          <td className="px-4 py-3 min-w-56 max-w-md whitespace-pre-wrap break-words">{task.title}</td>
+          <td className="px-4 py-3 min-w-48 max-w-md whitespace-pre-wrap break-words">{task.completion_criteria || '—'}</td>
+          <td className={`px-4 py-3 whitespace-nowrap ${overdue ? 'text-red-700' : ''}`}>{formatDisplayDate(task.due_date)}{overdue && <span className="block text-xs">期限超過</span>}</td>
+          <td className="px-4 py-3 min-w-48 max-w-md whitespace-pre-wrap break-words">{task.progress || '—'}</td>
+          <td className="px-4 py-3"><StatusCell task={task} editable={editable} /></td>
+        </tr>
+      })}{!tasks.length && <tr><td colSpan={7} className="p-8 text-center text-gray-500">課題がありません</td></tr>}</tbody>
+    </table>
+  </div>
 }
-
-function Detail({ label, value }: { label: string; value: string | null | undefined }) { return <div className="detail-list__row"><dt className="detail-list__label">{label}</dt><dd className="detail-list__value">{value || '-'}</dd></div> }

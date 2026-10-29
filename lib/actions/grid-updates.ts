@@ -1,6 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { taskFieldsSchema } from '@/lib/validation/task'
+import { requireCrmRelations, requireContactWrite, recordCrmActor } from '@/lib/auth/crm-permissions'
+import { AppError } from '@/lib/http/errors'
 import { updateCompany, type Company } from '@/lib/db/queries/companies'
 import { updateDealGridFields, type Deal } from '@/lib/db/queries/deals'
 import { updateContactGridFields, type Contact } from '@/lib/db/queries/contacts'
@@ -14,7 +17,7 @@ export type GridActionResult<T> =
 export type CompanyGridEditableField = 'name' | 'industry' | 'phone' | 'status'
 export type DealGridEditableField = 'title' | 'amount' | 'probability' | 'expected_close_date' | 'status'
 export type ContactGridEditableField = 'name' | 'department' | 'position' | 'email' | 'phone' | 'is_decision_maker'
-export type TaskGridEditableField = 'title' | 'due_date' | 'priority' | 'status'
+export type TaskGridEditableField = import('@/lib/db/queries/tasks').TaskEditableField
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
@@ -59,12 +62,13 @@ function checkboxValue(value: unknown) {
   throw new Error('チェックボックス値が不正です')
 }
 function fail(error: unknown): GridActionResult<never> {
-  return { ok: false, error: error instanceof Error ? error.message : '更新できませんでした' }
+  return { ok: false, error: error instanceof AppError ? error.message : '更新できませんでした。入力内容と権限を確認してください' }
 }
 
 export async function updateCompanyGridCellAction(id: string, field: CompanyGridEditableField, value: unknown): Promise<GridActionResult<Company>> {
   try {
     if (!validId(id)) return { ok: false, error: 'IDが不正です' }
+    const actor = await requireCrmRelations({ company_id: id })
     const data: Partial<Pick<Company, CompanyGridEditableField>> = {}
     if (field === 'name') data.name = requiredText(value, '会社名')
     else if (field === 'industry') data.industry = optionalText(value)
@@ -73,6 +77,7 @@ export async function updateCompanyGridCellAction(id: string, field: CompanyGrid
     else return { ok: false, error: '項目が不正です' }
     const updated = await updateCompany(id, data)
     if (!updated) return { ok: false, error: '対象が見つかりません' }
+    await recordCrmActor(actor.id, 'update', 'company', id)
     revalidatePath('/companies'); revalidatePath(`/companies/${id}`)
     return { ok: true, data: updated }
   } catch (error) { return fail(error) }
@@ -99,6 +104,7 @@ export async function updateDealGridCellAction(id: string, field: DealGridEditab
 export async function updateContactGridCellAction(id: string, field: ContactGridEditableField, value: unknown): Promise<GridActionResult<Contact>> {
   try {
     if (!validId(id)) return { ok: false, error: 'IDが不正です' }
+    const actor = await requireContactWrite(id)
     const data: Partial<Pick<Contact, ContactGridEditableField>> = {}
     if (field === 'name') data.name = requiredText(value, '氏名')
     else if (field === 'department') data.department = optionalText(value)
@@ -109,6 +115,7 @@ export async function updateContactGridCellAction(id: string, field: ContactGrid
     else return { ok: false, error: '項目が不正です' }
     const updated = await updateContactGridFields(id, data)
     if (!updated) return { ok: false, error: '対象が見つかりません' }
+    await recordCrmActor(actor.id, 'update', 'contact', id)
     revalidatePath('/contacts'); revalidatePath(`/contacts/${id}/edit`)
     return { ok: true, data: updated }
   } catch (error) { return fail(error) }
@@ -116,17 +123,18 @@ export async function updateContactGridCellAction(id: string, field: ContactGrid
 
 export async function updateTaskGridCellAction(id: string, field: TaskGridEditableField, value: unknown): Promise<GridActionResult<Task>> {
   try {
-    await requireTaskWrite(id)
-    if (!validId(id)) return { ok: false, error: 'IDが不正です' }
-    const data: Partial<Pick<Task, TaskGridEditableField>> = {}
-    if (field === 'title') data.title = requiredText(value, 'タイトル')
-    else if (field === 'due_date') data.due_date = optionalDate(value)
-    else if (field === 'priority') data.priority = selectValue(value, ['low', 'medium', 'high'] as const)
-    else if (field === 'status') data.status = selectValue(value, ['open', 'done'] as const)
-    else return { ok: false, error: '項目が不正です' }
-    const updated = await updateTaskGridFields(id, data)
-    if (!updated) return { ok: false, error: '対象が見つかりません' }
-    revalidatePath('/tasks'); revalidatePath(`/tasks/${id}/edit`)
+    const { task } = await requireTaskWrite(id)
+    if (!Object.hasOwn(taskFieldsSchema.shape, field)) return { ok: false, error: '項目が不正です' }
+    const parsed = taskFieldsSchema.shape[field].safeParse(value)
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message }
+    const updated = await updateTaskGridFields(id, { [field]: parsed.data })
+    if (!updated) return { ok: false, error: '課題が見つかりません' }
+    revalidatePath('/tasks'); revalidatePath('/dashboard'); revalidatePath(`/tasks/${id}/edit`)
+    if (task.company_id) revalidatePath(`/companies/${task.company_id}`)
+    if (task.deal_id) revalidatePath(`/deals/${task.deal_id}`)
     return { ok: true, data: updated }
-  } catch (error) { return fail(error) }
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') return { ok: false, error: 'この顧客では同じNoが使われています' }
+    return fail(error)
+  }
 }

@@ -136,9 +136,10 @@ export async function createDeal(data: {
   expected_close_date?: string
   owner_user_id?: string
   memo?: string
+  created_by?: string
 }): Promise<Deal> {
   const rows = await sql`
-    INSERT INTO deals (company_id, title, amount, stage_id, probability, expected_close_date, owner_user_id, memo)
+    INSERT INTO deals (company_id, title, amount, stage_id, probability, expected_close_date, owner_user_id, memo, created_by)
     VALUES (
       ${data.company_id},
       ${data.title},
@@ -147,7 +148,8 @@ export async function createDeal(data: {
       ${data.probability ?? 0},
       ${data.expected_close_date ?? null},
       ${data.owner_user_id ?? null},
-      ${data.memo ?? null}
+      ${data.memo ?? null},
+      ${data.created_by ?? null}
     )
     RETURNING *
   `

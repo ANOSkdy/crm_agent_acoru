@@ -1,0 +1,18 @@
+import { readFile, mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { createBusinessDocumentPdf } from '../src/pdf.ts'
+import { templateInputSchema, templateDocument } from '../src/template.ts'
+import { issuerSchema } from '../src/domain.ts'
+
+const input = JSON.parse(
+  await readFile(process.argv[2] ?? 'examples/invoice.json', 'utf8'),
+)
+const document = templateInputSchema.parse(input)
+const issuer = issuerSchema.parse(input.issuer)
+const destination = process.argv[3] ?? `output/${document.kind}.pdf`
+await mkdir(path.dirname(destination), { recursive: true })
+await writeFile(
+  destination,
+  await createBusinessDocumentPdf(templateDocument(document, issuer), document),
+)
+console.log(`Created ${destination}`)

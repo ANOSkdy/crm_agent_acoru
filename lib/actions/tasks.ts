@@ -1,57 +1,68 @@
 'use server'
-
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createTask, updateTask, completeTask, deleteTask } from '@/lib/db/queries/tasks'
+import { z } from 'zod'
+import { addTaskTab, createTask, updateTask, deleteTask, type Task } from '@/lib/db/queries/tasks'
 import { createTaskSchema, updateTaskSchema } from '@/lib/validation/task'
-import { requireApiUser, requireDealAccess, requireTaskWrite } from '@/lib/auth/deal-permissions'
-import { AgentError } from '@/lib/agent/errors'
-
-async function checkTarget(data: { deal_id?: string; company_id?: string }) {
-  const user = await requireApiUser()
-  if (user.role === 'viewer') throw new AgentError(403, '更新権限がありません')
-  if (data.deal_id) {
-    const { deal } = await requireDealAccess(data.deal_id, true)
-    if (data.company_id && data.company_id !== deal.company_id) throw new AgentError(400, '案件と顧客が一致しません')
-  }
-  return user
+import { requireTaskWrite } from '@/lib/auth/deal-permissions'
+import { requireCrmRelations, requireCrmWrite } from '@/lib/auth/crm-permissions'
+import { AppError } from '@/lib/http/errors'
+export type TaskActionState = { error?: string }
+function actionError(error: unknown): TaskActionState {
+  if (error instanceof AppError) return { error: error.message }
+  if (error instanceof z.ZodError) return { error: error.issues[0].message }
+  if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') return { error: 'この顧客では同じNoが使われています' }
+  return { error: '保存できませんでした。入力内容と接続を確認してください' }
 }
-
-export async function createTaskAction(formData: FormData): Promise<void> {
-  const raw = Object.fromEntries(formData.entries())
-  const parsed = createTaskSchema.safeParse(raw)
-  if (!parsed.success) {
-    console.error('Validation error:', parsed.error.issues[0].message)
-    return
-  }
-  const user = await checkTarget(parsed.data)
-  await createTask({ ...parsed.data, assigned_to: user.id })
-  const companyId = parsed.data.company_id
-  if (companyId) redirect(`/companies/${companyId}`)
-  redirect('/tasks')
+function refreshTask(task: Pick<Task, 'id' | 'company_id' | 'deal_id'>) {
+  revalidatePath('/tasks')
+  revalidatePath('/dashboard')
+  revalidatePath(`/tasks/${task.id}/edit`)
+  if (task.company_id) revalidatePath(`/companies/${task.company_id}`)
+  if (task.deal_id) revalidatePath(`/deals/${task.deal_id}`)
 }
-
-export async function updateTaskAction(id: string, formData: FormData): Promise<void> {
-  await requireTaskWrite(id)
-  const redirectTo = formData.get('redirectTo')?.toString()
-  const raw = Object.fromEntries(formData.entries())
-  delete raw.redirectTo
-  const parsed = updateTaskSchema.safeParse(raw)
-  if (!parsed.success) {
-    console.error('Validation error:', parsed.error.issues[0].message)
-    return
-  }
-  await checkTarget(parsed.data)
-  await updateTask(id, parsed.data)
-  redirect(redirectTo || (parsed.data.company_id ? `/companies/${parsed.data.company_id}` : '/tasks'))
+export async function addTaskTabAction(_state: TaskActionState, formData: FormData): Promise<TaskActionState> {
+  let companyId: string
+  try {
+    await requireCrmWrite()
+    companyId = z.uuid('顧客を選択してください').parse(formData.get('company_id'))
+    const user = await requireCrmRelations({ company_id: companyId })
+    await addTaskTab(companyId, user.id)
+    revalidatePath('/tasks')
+  } catch (error) { return actionError(error) }
+  redirect(`/tasks?company=${companyId}`)
 }
-
-export async function completeTaskAction(id: string): Promise<void> {
-  await requireTaskWrite(id)
-  await completeTask(id)
+export async function createTaskAction(_state: TaskActionState, formData: FormData): Promise<TaskActionState> {
+  let task: Task
+  try {
+    await requireCrmWrite()
+    const data = createTaskSchema.parse(Object.fromEntries(formData.entries()))
+    const user = await requireCrmRelations(data)
+    task = await createTask({ ...data, assigned_to: user.id, created_by: user.id })
+    refreshTask(task)
+  } catch (error) { return actionError(error) }
+  redirect(`/tasks?company=${task.company_id}`)
 }
-
-export async function deleteTaskAction(id: string, companyId?: string): Promise<void> {
-  await requireTaskWrite(id)
-  await deleteTask(id)
-  redirect(companyId ? `/companies/${companyId}` : '/tasks')
+export async function updateTaskAction(id: string, _state: TaskActionState, formData: FormData): Promise<TaskActionState> {
+  let updated: Task
+  try {
+    const { task } = await requireTaskWrite(id)
+    const data = updateTaskSchema.parse(Object.fromEntries(formData.entries()))
+    if (task.deal_id && !data.company_id) throw new AppError(400, '案件に紐づく課題は顧客を指定してください')
+    await requireCrmRelations({ company_id: data.company_id, deal_id: task.deal_id ?? undefined })
+    const result = await updateTask(id, data)
+    if (!result) throw new AppError(404, '課題が見つかりません')
+    updated = result
+    refreshTask(task)
+    refreshTask(updated)
+  } catch (error) { return actionError(error) }
+  redirect(`/tasks?company=${updated.company_id ?? 'unassigned'}`)
+}
+export async function deleteTaskAction(id: string): Promise<TaskActionState> {
+  try {
+    const { task } = await requireTaskWrite(id)
+    await deleteTask(id)
+    refreshTask(task)
+  } catch (error) { return actionError(error) }
+  return {}
 }

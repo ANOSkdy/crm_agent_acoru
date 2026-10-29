@@ -1,0 +1,11 @@
+.local-test
+/output
+.env*
+tests
+docs
+/templates
+scripts/billing/legacy-sanitized.json
+.acoru-raw-sync.json
+.acoru-raw-sync.json.*
+# Browser verification scripts depend on the excluded local test helpers.
+scripts/**/verify*.mts

@@ -1,15 +1,13 @@
 export const dynamic = 'force-dynamic'
+import { SourceLinks } from '@/components/raw/SourceLinks'
 
 import { notFound } from 'next/navigation'
 import { getDealById } from '@/lib/db/queries/deals'
-import { getActivities } from '@/lib/db/queries/activities'
 import { getTasks } from '@/lib/db/queries/tasks'
-import { getFiles } from '@/lib/db/queries/files'
 import { Badge, stageBadgeVariant } from '@/components/ui/Badge'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import Link from 'next/link'
 import { formatDisplayDate } from '@/lib/utils/date'
-import { DealProgressCard } from '@/components/assistant/DealProgressCard'
 
 const formatDate = formatDisplayDate
 
@@ -19,11 +17,9 @@ interface Props {
 
 export default async function DealDetailPage({ params }: Props) {
   const { dealId } = await params
-  const [deal, activities, tasks, files] = await Promise.all([
+  const [deal, tasks] = await Promise.all([
     getDealById(dealId),
-    getActivities({ dealId }),
     getTasks({ dealId }),
-    getFiles({ dealId }),
   ])
 
   if (!deal) notFound()
@@ -56,45 +52,21 @@ export default async function DealDetailPage({ params }: Props) {
         </CardBody>
       </Card>
 
-      <DealProgressCard dealId={dealId} />
-
-      {/* Activities */}
-      <Card>
-        <CardHeader><h2 className="font-semibold">活動履歴</h2></CardHeader>
-        <CardBody className="p-0">
-          {activities.length === 0 ? (
-            <p className="px-6 py-4 text-sm text-gray-500">活動履歴がありません</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {activities.map((a) => (
-                <li key={a.id} id={`activity-${a.id}`} className="px-6 py-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mr-2">{a.type}</span>
-                      <span className="text-sm">{a.summary}</span>
-                    </div>
-                    <span className="text-xs text-gray-400">{formatDate(a.activity_date)}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
+      <SourceLinks dealId={dealId}/>
 
       {/* Tasks */}
       <Card>
-        <CardHeader><h2 className="font-semibold">タスク</h2></CardHeader>
+        <CardHeader><h2 className="font-semibold">課題</h2></CardHeader>
         <CardBody className="p-0">
           {tasks.length === 0 ? (
-            <p className="px-6 py-4 text-sm text-gray-500">タスクがありません</p>
+            <p className="px-6 py-4 text-sm text-gray-500">課題がありません</p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {tasks.map((t) => {
-                const isOverdue = t.due_date && t.status === 'open' && new Date(t.due_date) < now
+                const isOverdue = t.due_date && ['open', 'in_progress'].includes(t.status) && t.due_date.slice(0, 10) < formatDate(now)
                 return (
                   <li key={t.id} id={`task-${t.id}`} className={`px-6 py-3 flex items-center justify-between ${isOverdue ? 'bg-red-50' : ''}`}>
-                    <span className={`text-sm ${isOverdue ? 'text-red-700 font-medium' : 'text-gray-900'} ${t.status === 'done' ? 'line-through text-gray-400' : ''}`}>{t.title}</span>
+                    <span className={`text-sm ${isOverdue ? 'text-red-700 font-medium' : 'text-gray-900'} ${t.status === 'done' ? 'line-through text-gray-400' : ''}`}><Link href={`/tasks?company=${deal.company_id}`}>{t.title}</Link></span>
                     <span className={`text-xs ${isOverdue ? 'text-red-600' : 'text-gray-400'}`}>{formatDate(t.due_date)}</span>
                   </li>
                 )
@@ -104,24 +76,6 @@ export default async function DealDetailPage({ params }: Props) {
         </CardBody>
       </Card>
 
-      {/* Files */}
-      <Card>
-        <CardHeader><h2 className="font-semibold">ファイル</h2></CardHeader>
-        <CardBody className="p-0">
-          {files.length === 0 ? (
-            <p className="px-6 py-4 text-sm text-gray-500">ファイルがありません</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {files.map((f) => (
-                <li key={f.id} className="px-6 py-3 flex items-center justify-between">
-                  <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">{f.filename}</a>
-                  <span className="text-xs text-gray-400">{formatDate(f.created_at)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
     </div>
   )
 }

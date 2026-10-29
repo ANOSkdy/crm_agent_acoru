@@ -1,16 +1,19 @@
 import 'server-only'
-import { sql } from '@/lib/db'
-
+import { sql, getSql } from '@/lib/db'
+import { toDateInputValue } from '@/lib/utils/date'
+import type { CreateTaskInput, UpdateTaskInput, taskStatusLabels } from '@/lib/validation/task'
 export interface Task {
   id: string
   company_id: string | null
   company_name?: string
   deal_id: string | null
+  issue_number: number
+  opened_on: string
   title: string
-  description: string | null
+  completion_criteria: string
   due_date: string | null
-  priority: string
-  status: string
+  progress: string
+  status: keyof typeof taskStatusLabels
   assigned_to: string | null
   created_by: string | null
   completed_at: string | null
@@ -18,136 +21,66 @@ export interface Task {
   updated_at: string
   deleted_at: string | null
 }
-
-type Row = Record<string, unknown>
-function toTask(r: Row): Task { return r as unknown as Task }
-function emptyToNull(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : null
-}
-
+export type TaskTab = { company_id: string; company_name: string }
+export type TaskEditableField = 'issue_number' | 'opened_on' | 'title' | 'completion_criteria' | 'due_date' | 'progress' | 'status'
+const toTask = (row: Record<string, unknown>): Task => ({
+  ...row,
+  opened_on: toDateInputValue(row.opened_on as string | Date),
+  due_date: row.due_date ? toDateInputValue(row.due_date as string | Date) : null,
+} as unknown as Task)
 export async function getTasks(filters?: { companyId?: string; dealId?: string; status?: string }): Promise<Task[]> {
-  const companyId = filters?.companyId ?? null
-  const dealId = filters?.dealId ?? null
-  const status = filters?.status ?? null
-
-  let rows: Row[]
-  if (companyId) {
-    rows = await sql`
-      SELECT t.*, co.name as company_name FROM tasks t
-      LEFT JOIN companies co ON co.id = t.company_id
-      WHERE t.deleted_at IS NULL AND t.company_id = ${companyId}
-      ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
-    `
-  } else if (dealId) {
-    rows = await sql`
-      SELECT t.*, co.name as company_name FROM tasks t
-      LEFT JOIN companies co ON co.id = t.company_id
-      WHERE t.deleted_at IS NULL AND t.deal_id = ${dealId}
-      ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
-    `
-  } else if (status) {
-    rows = await sql`
-      SELECT t.*, co.name as company_name FROM tasks t
-      LEFT JOIN companies co ON co.id = t.company_id
-      WHERE t.deleted_at IS NULL AND t.status = ${status}
-      ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
-    `
-  } else {
-    rows = await sql`
-      SELECT t.*, co.name as company_name FROM tasks t
-      LEFT JOIN companies co ON co.id = t.company_id
-      WHERE t.deleted_at IS NULL
-      ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
-    `
-  }
+  const rows = await sql`SELECT t.*, c.name AS company_name FROM crm_live_tasks t LEFT JOIN companies c ON c.id = t.company_id
+    WHERE (${filters?.companyId ?? null}::uuid IS NULL OR t.company_id = ${filters?.companyId ?? null}::uuid)
+      AND (${filters?.dealId ?? null}::uuid IS NULL OR t.deal_id = ${filters?.dealId ?? null}::uuid)
+      AND (${filters?.status ?? null}::text IS NULL OR t.status = ${filters?.status ?? null})
+    ORDER BY t.issue_number, t.id`
   return rows.map(toTask)
 }
-
-export async function getTasksByCompany(companyId: string): Promise<Task[]> {
-  return getTasks({ companyId })
-}
-
+export const getTasksByCompany = (companyId: string) => getTasks({ companyId })
 export async function getTaskById(id: string): Promise<Task | null> {
-  const rows = await sql`
-    SELECT t.*, co.name as company_name FROM tasks t
-    LEFT JOIN companies co ON co.id = t.company_id
-    WHERE t.id = ${id} AND t.deleted_at IS NULL
-  `
+  const rows = await sql`SELECT t.*, c.name AS company_name FROM crm_live_tasks t LEFT JOIN companies c ON c.id = t.company_id WHERE t.id = ${id}`
   return rows[0] ? toTask(rows[0]) : null
 }
-
-export async function createTask(data: {
-  company_id?: string
-  deal_id?: string
-  title: string
-  description?: string
-  due_date?: string
-  priority?: string
-  assigned_to?: string
-}): Promise<Task> {
-  const rows = await sql`
-    INSERT INTO tasks (company_id, deal_id, title, description, due_date, priority, assigned_to)
-    VALUES (
-      ${data.company_id ?? null},
-      ${data.deal_id ?? null},
-      ${data.title},
-      ${data.description ?? null},
-      ${data.due_date ?? null},
-      ${data.priority ?? 'medium'},
-      ${data.assigned_to ?? null}
-    )
-    RETURNING *
-  `
+export async function getTaskTabs(): Promise<TaskTab[]> {
+  return await sql`SELECT b.company_id, c.name AS company_name FROM task_company_tabs b
+    JOIN companies c ON c.id = b.company_id AND c.deleted_at IS NULL ORDER BY b.created_at, b.company_id` as TaskTab[]
+}
+export async function addTaskTab(companyId: string, userId: string): Promise<void> {
+  await sql`INSERT INTO task_company_tabs(company_id, created_by) SELECT id, ${userId} FROM companies
+    WHERE id = ${companyId} AND deleted_at IS NULL ON CONFLICT (company_id) DO NOTHING`
+}
+export async function createTask(data: CreateTaskInput & { created_by: string; assigned_to: string }): Promise<Task> {
+  const rows = await sql`INSERT INTO tasks
+    (company_id, issue_number, opened_on, title, completion_criteria, due_date, progress, status, created_by, assigned_to, completed_at)
+    VALUES (${data.company_id}, ${data.issue_number ?? null}, ${data.opened_on}, ${data.title}, ${data.completion_criteria},
+      ${data.due_date}, ${data.progress}, ${data.status}, ${data.created_by}, ${data.assigned_to},
+      CASE WHEN ${data.status} = 'done' THEN now() ELSE NULL END) RETURNING *`
   return toTask(rows[0])
 }
-
-export async function updateTask(id: string, data: { company_id?: string; deal_id?: string; title: string; description?: string; due_date?: string; priority: string; status?: string }): Promise<Task | null> {
-  const completedAt = data.status === 'done' ? new Date().toISOString() : null
-  const rows = await sql`
-    UPDATE tasks SET
-      company_id = ${emptyToNull(data.company_id)},
-      deal_id = ${emptyToNull(data.deal_id)},
-      title = ${data.title},
-      description = ${emptyToNull(data.description)},
-      due_date = ${emptyToNull(data.due_date)},
-      priority = ${data.priority},
-      status = ${data.status ?? 'open'},
-      completed_at = ${completedAt},
-      updated_at = now()
-    WHERE id = ${id} AND deleted_at IS NULL
-    RETURNING *
-  `
+export async function updateTask(id: string, data: UpdateTaskInput): Promise<Task | null> {
+  const rows = await sql`UPDATE tasks SET company_id = ${data.company_id ?? null}, issue_number = ${data.issue_number},
+    opened_on = ${data.opened_on}, title = ${data.title}, completion_criteria = ${data.completion_criteria},
+    due_date = ${data.due_date}, progress = ${data.progress}, status = ${data.status},
+    completed_at = CASE WHEN ${data.status} = 'done' THEN COALESCE(completed_at, now()) ELSE NULL END, updated_at = now()
+    WHERE id = ${id} AND deleted_at IS NULL RETURNING *`
   return rows[0] ? toTask(rows[0]) : null
 }
-
-export async function completeTask(id: string): Promise<void> {
-  await sql`
-    UPDATE tasks SET status = 'done', completed_at = now(), updated_at = now()
-    WHERE id = ${id}
-  `
-}
-
 export async function deleteTask(id: string): Promise<void> {
-  await sql`UPDATE tasks SET deleted_at = now() WHERE id = ${id}`
+  await sql`UPDATE tasks SET deleted_at = now(), updated_at = now() WHERE id = ${id} AND deleted_at IS NULL`
 }
-
-export async function updateTaskGridFields(id: string, data: Partial<Pick<Task, 'title' | 'due_date' | 'priority' | 'status'>>): Promise<Task | null> {
-  const before = await getTaskById(id)
-  if (!before) return null
-  const nextStatus = Object.hasOwn(data, 'status') ? data.status : before.status
-  const completedAt = nextStatus === 'done' ? (before.completed_at ?? new Date().toISOString()) : null
-  const rows = await sql`
-    UPDATE tasks SET
-      title = ${Object.hasOwn(data, 'title') ? data.title : before.title},
-      due_date = ${Object.hasOwn(data, 'due_date') ? data.due_date : before.due_date},
-      priority = ${Object.hasOwn(data, 'priority') ? data.priority : before.priority},
-      status = ${nextStatus},
-      completed_at = ${completedAt},
-      updated_at = now()
-    WHERE id = ${id} AND deleted_at IS NULL
-    RETURNING *
-  `
+export async function updateTaskGridFields(id: string, data: Partial<Pick<Task, TaskEditableField>>): Promise<Task | null> {
+  const allowed: TaskEditableField[] = ['issue_number', 'opened_on', 'title', 'completion_criteria', 'due_date', 'progress', 'status']
+  const fields = allowed.filter(field => Object.hasOwn(data, field))
+  if (!fields.length) return getTaskById(id)
+  // Column identifiers come exclusively from the allowlist; values are parameterized.
+  const values: unknown[] = fields.map(field => data[field])
+  const assignments = fields.map((field, index) => `${field} = $${index + 1}`)
+  if (fields.includes('status')) {
+    const position = fields.indexOf('status') + 1
+    assignments.push(`completed_at = CASE WHEN $${position} = 'done' THEN COALESCE(completed_at, now()) ELSE NULL END`)
+  }
+  values.push(id)
+  const rows = await getSql().query(`UPDATE tasks SET ${assignments.join(', ')}, updated_at = now()
+    WHERE id = $${values.length} AND deleted_at IS NULL RETURNING id`, values)
   return rows[0] ? getTaskById(String(rows[0].id)) : null
 }

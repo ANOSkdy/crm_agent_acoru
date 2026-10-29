@@ -4,22 +4,18 @@ import { notFound } from 'next/navigation'
 import { getCompanyById } from '@/lib/db/queries/companies'
 import { getContacts } from '@/lib/db/queries/contacts'
 import { getDeals, getDealStages } from '@/lib/db/queries/deals'
-import { getActivitiesByCompany } from '@/lib/db/queries/activities'
 import { getTasksByCompany } from '@/lib/db/queries/tasks'
-import { getFilesByCompany } from '@/lib/db/queries/files'
-import { getAiSummaries } from '@/lib/db/queries/ai_summaries'
 import { Badge, stageBadgeVariant, statusBadgeVariant } from '@/components/ui/Badge'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { createContactAction, deleteContactAction } from '@/lib/actions/contacts'
 import { createDealAction, deleteDealAction } from '@/lib/actions/deals'
-import { createActivityAction, deleteActivityAction } from '@/lib/actions/activities'
-import { createTaskAction, completeTaskAction, deleteTaskAction } from '@/lib/actions/tasks'
-import { createFileAction, deleteFileAction } from '@/lib/actions/files'
 import { deleteCompanyAction } from '@/lib/actions/companies'
 import { DeleteCompanyButton } from './DeleteCompanyButton'
-import { GenerateSummaryButton } from './GenerateSummaryButton'
 import Link from 'next/link'
+import { billingUser, repository } from '@/lib/billing/server'
 import { formatDisplayDate, formatDisplayDateTime } from '@/lib/utils/date'
+import { mailEnabled, mailRepository } from '@/lib/bulk-mail/server'
+import { campaignLabels } from '@/lib/bulk-mail/domain'
 
 const formatDate = formatDisplayDate
 
@@ -27,36 +23,35 @@ interface Props {
   params: Promise<{ companyId: string }>
 }
 
-const activityTypeLabels: Record<string, string> = {
-  call: '電話',
-  email: 'メール',
-  meeting: 'ミーティング',
-  visit: '訪問',
-  other: 'その他',
-}
 
-const priorityLabels: Record<string, string> = {
-  high: '高',
-  medium: '中',
-  low: '低',
-}
+
 
 export default async function CompanyDetailPage({ params }: Props) {
   const { companyId } = await params
-  const [company, contacts, deals, activities, tasks, files, aiSummaries, stages] = await Promise.all([
+  const [company, contacts, deals, tasks, stages] = await Promise.all([
     getCompanyById(companyId),
     getContacts(companyId),
     getDeals({ companyId }),
-    getActivitiesByCompany(companyId),
     getTasksByCompany(companyId),
-    getFilesByCompany(companyId),
-    getAiSummaries(companyId),
     getDealStages(),
   ])
 
   if (!company) notFound()
 
-  const now = new Date()
+  const billingAdmin = await billingUser()
+  const billingCustomer = billingAdmin
+    ? (await repository().customers()).find((c) => c.companyId === companyId)
+    : null
+  const linkedInvoices = billingAdmin
+    ? (await repository().invoices())
+        .filter((i) => i.company_id === companyId)
+        .slice(0, 6)
+    : []
+  const mailRepo = billingAdmin && mailEnabled() ? await mailRepository() : null
+  const [mailHistory, mailAddress] = mailRepo
+    ? await Promise.all([mailRepo.list(companyId), mailRepo.address(companyId)])
+    : [null, null]
+
 
   async function deleteAction() {
     'use server'
@@ -99,6 +94,40 @@ export default async function CompanyDetailPage({ params }: Props) {
           </dl>
         </CardBody>
       </Card>
+
+      {/* Billing */}
+      {billingAdmin && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">請求設定・請求履歴</h2>
+              <Link
+                className="btn btn--primary"
+                href={`/billing?company=${companyId}`}
+              >
+                請求の有効／無効を設定
+              </Link>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <p>
+              請求：{billingCustomer?.billingEnabled ? '有効' : '無効'} ／
+              有効にすると今月分の請求書を仮作成します。
+            </p>
+            <div className="flex flex-wrap gap-3 mt-3">
+              {linkedInvoices.map((i) => (
+                <Link
+                  key={i.id}
+                  className="text-blue-600 underline"
+                  href={`/billing/${i.id}`}
+                >
+                  {i.period}　{Number(i.total).toLocaleString()}円
+                </Link>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Contacts */}
       <Card>
@@ -189,153 +218,16 @@ export default async function CompanyDetailPage({ params }: Props) {
         </CardBody>
       </Card>
 
-      {/* Activities */}
-      <Card>
-        <CardHeader><h2 className="font-semibold">活動履歴</h2></CardHeader>
-        <CardBody className="p-0">
-          {activities.length > 0 && (
-            <ul className="divide-y divide-gray-100">
-              {activities.map((a) => (
-                <li key={a.id} className="px-6 py-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mr-2">{activityTypeLabels[a.type] ?? a.type}</span>
-                      <span className="text-sm font-medium">{a.summary}</span>
-                      {a.body && <p className="text-xs text-gray-500 mt-1">{a.body}</p>}
-                      {a.next_action && <p className="text-xs text-blue-600 mt-1">次のアクション: {a.next_action}</p>}
-                    </div>
-                    <div className="flex items-center gap-2 whitespace-nowrap ml-4"><span className="text-xs text-gray-400">{formatDate(a.activity_date)}</span><Link href={`/activities/${a.id}/edit`} className="text-xs text-blue-600 hover:underline">編集</Link><form action={deleteActivityAction.bind(null, a.id, companyId)}><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="px-6 py-4 border-t border-gray-100">
-            <details>
-              <summary className="text-sm text-blue-600 cursor-pointer hover:underline">+ 活動を記録</summary>
-              <form action={createActivityAction} className="mt-3 space-y-3">
-                <input type="hidden" name="company_id" value={companyId} />
-                <div className="grid grid-cols-2 gap-3">
-                  <select name="type" className="px-3 py-2 border border-gray-300 rounded text-sm">
-                    <option value="call">電話</option>
-                    <option value="email">メール</option>
-                    <option value="meeting">ミーティング</option>
-                    <option value="visit">訪問</option>
-                    <option value="other">その他</option>
-                  </select>
-                  <input name="activity_date" type="datetime-local" required className="px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <input name="summary" placeholder="概要 *" required className="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <textarea name="body" placeholder="詳細" rows={2} className="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <input name="next_action" placeholder="次のアクション" className="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm" />
-                </div>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">記録</button>
-              </form>
-            </details>
-          </div>
-        </CardBody>
-      </Card>
+      <Card><CardHeader><h2 className="font-semibold">課題管理</h2></CardHeader><CardBody>
+        <p className="text-sm text-gray-500 mb-3">登録済みの課題：{tasks.length}件</p>
+        <Link href={`/tasks?company=${companyId}`} className="text-blue-600 underline">この顧客の課題を管理</Link>
+      </CardBody></Card>
 
-      {/* Tasks */}
-      <Card>
-        <CardHeader><h2 className="font-semibold">タスク</h2></CardHeader>
-        <CardBody className="p-0">
-          {tasks.length > 0 && (
-            <ul className="divide-y divide-gray-100">
-              {tasks.map((t) => {
-                const isOverdue = t.due_date && t.status === 'open' && new Date(t.due_date) < now
-                return (
-                  <li key={t.id} className={`px-6 py-3 ${isOverdue ? 'bg-red-50' : ''}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className={`text-sm font-medium ${t.status === 'done' ? 'line-through text-gray-400' : ''} ${isOverdue ? 'text-red-700' : 'text-gray-900'}`}>{t.title}</span>
-                        <span className="ml-2 text-xs text-gray-500">[{priorityLabels[t.priority] ?? t.priority}]</span>
-                      </div>
-                      <div className="flex items-center gap-2"><span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>{formatDate(t.due_date)}</span>{t.status === 'open' && <form action={completeTaskAction.bind(null, t.id)}><button type="submit" className="text-xs text-green-600 hover:underline">完了</button></form>}<Link href={`/tasks/${t.id}/edit`} className="text-xs text-blue-600 hover:underline">編集</Link><form action={deleteTaskAction.bind(null, t.id, companyId)}><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          <div className="px-6 py-4 border-t border-gray-100">
-            <details>
-              <summary className="text-sm text-blue-600 cursor-pointer hover:underline">+ タスクを追加</summary>
-              <form action={createTaskAction} className="mt-3 space-y-3">
-                <input type="hidden" name="company_id" value={companyId} />
-                <div className="grid grid-cols-2 gap-3">
-                  <input name="title" placeholder="タイトル *" required className="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <input name="due_date" type="date" className="px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <select name="priority" className="px-3 py-2 border border-gray-300 rounded text-sm">
-                    <option value="high">高</option>
-                    <option value="medium">中</option>
-                    <option value="low">低</option>
-                  </select>
-                </div>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">追加</button>
-              </form>
-            </details>
-          </div>
-        </CardBody>
-      </Card>
+      {mailHistory ? <Card>
+        <CardHeader><div className="flex items-center justify-between"><h2 className="font-semibold">業務連絡メール</h2><Link href={`/bulk-mail?company=${companyId}`} className="text-sm text-blue-600 hover:underline">メールを作成・履歴を確認</Link></div></CardHeader>
+        <CardBody><p className="text-sm mb-3">業務連絡用代表メール：{mailAddress?.email || '未登録'} <Link href={`/bulk-mail?company=${companyId}&view=addresses`} className="text-blue-600 hover:underline ml-3">代表メールを設定</Link></p>{mailHistory.length ? <ul className="space-y-3">{mailHistory.slice(0, 5).map(mail => <li key={mail.id}><Link href={`/bulk-mail?company=${companyId}`} className="text-sm text-blue-600 hover:underline">{mail.subject}</Link><p className="text-xs text-gray-500">{campaignLabels[mail.status]} · {formatDisplayDateTime(mail.updatedAt)} · {mail.review?.filter(r => r.companyId === companyId && !r.exclusion).map(r => r.email).join('、')}</p></li>)}</ul> : <p className="text-sm text-gray-500">業務連絡メールの履歴はありません。</p>}</CardBody>
+      </Card> : null}
 
-      {/* Files */}
-      <Card>
-        <CardHeader><h2 className="font-semibold">ファイル</h2></CardHeader>
-        <CardBody className="p-0">
-          {files.length > 0 && (
-            <ul className="divide-y divide-gray-100">
-              {files.map((f) => (
-                <li key={f.id} className="px-6 py-3 flex items-center justify-between">
-                  <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">{f.filename}</a>
-                  <div className="flex items-center gap-2"><span className="text-xs text-gray-400">{formatDate(f.created_at)}</span><Link href={`/files/${f.id}/edit`} className="text-xs text-blue-600 hover:underline">編集</Link><form action={deleteFileAction.bind(null, f.id, companyId)}><button type="submit" className="text-xs text-red-500 hover:underline">削除</button></form></div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="px-6 py-4 border-t border-gray-100">
-            <details>
-              <summary className="text-sm text-blue-600 cursor-pointer hover:underline">+ ファイルを追加</summary>
-              <form action={createFileAction} className="mt-3 space-y-3">
-                <input type="hidden" name="company_id" value={companyId} />
-                <div className="grid grid-cols-2 gap-3">
-                  <input name="filename" placeholder="ファイル名 *" required className="px-3 py-2 border border-gray-300 rounded text-sm" />
-                  <input name="file_url" type="url" placeholder="URL *" required className="px-3 py-2 border border-gray-300 rounded text-sm" />
-                </div>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">追加</button>
-              </form>
-            </details>
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* AI Summaries */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">AIサマリー</h2>
-            <GenerateSummaryButton companyId={companyId} />
-          </div>
-        </CardHeader>
-        <CardBody className="p-0">
-          {aiSummaries.length === 0 ? (
-            <p className="px-6 py-4 text-sm text-gray-500">AIサマリーがありません。上のボタンから生成してください。</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {aiSummaries.map((s) => (
-                <li key={s.id} className="px-6 py-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                      {s.summary_type === 'company_summary' ? '顧客サマリー' : 'ネクストアクション提案'}
-                    </span>
-                    <span className="text-xs text-gray-400">{formatDisplayDateTime(s.created_at)}</span>
-                  </div>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{s.content}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
     </div>
   )
 }
