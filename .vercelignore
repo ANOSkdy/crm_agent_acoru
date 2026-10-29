@@ -7,5 +7,5 @@ docs
 scripts/billing/legacy-sanitized.json
 .acoru-raw-sync.json
 .acoru-raw-sync.json.*
-scripts/raw/verify-browser.mts
-scripts/bulk-mail/verify-browser.mts
+# Browser verification scripts depend on the excluded local test helpers.
+scripts/**/verify*.mts
