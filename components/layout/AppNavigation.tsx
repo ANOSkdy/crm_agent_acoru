@@ -8,15 +8,11 @@ import { logoutAction } from '@/lib/actions/auth'
 const NAV_COLLAPSED_KEY = 'acoru.crm.navCollapsed'
 
 const navItems = [
-  { href: '/assistant', label: 'AIアシスタント' },
   { href: '/dashboard', label: 'ダッシュボード' },
   { href: '/companies', label: '顧客' },
   { href: '/contacts', label: '担当者' },
   { href: '/deals', label: '案件' },
-  { href: '/activities', label: '活動履歴' },
-  { href: '/tasks', label: 'タスク' },
-  { href: '/files', label: 'ファイル' },
-  { href: '/reports', label: 'レポート' },
+  { href: '/tasks', label: '課題管理' },
   { href: '/billing', label: '請求管理' },
 ]
 
@@ -24,16 +20,19 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export function AppNavigation() {
+export function AppNavigation({ localMail = false }: { localMail?: boolean }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      setCollapsed(localStorage.getItem(NAV_COLLAPSED_KEY) === 'true')
-    }, 0)
-
-    return () => window.clearTimeout(id)
+    const mobile = window.matchMedia('(max-width: 640px)')
+    const restore = () => {
+      const saved = localStorage.getItem(NAV_COLLAPSED_KEY)
+      setCollapsed(saved === null ? mobile.matches : saved === 'true')
+    }
+    const id = window.setTimeout(restore, 0)
+    mobile.addEventListener('change', restore)
+    return () => { window.clearTimeout(id); mobile.removeEventListener('change', restore) }
   }, [])
 
   const toggleCollapsed = () => {
@@ -58,7 +57,7 @@ export function AppNavigation() {
         </button>
       </div>
       <ul className="app-nav__list">
-        {navItems.map((item) => {
+        {[...navItems, ...(localMail ? [{ href: '/bulk-mail', label: '一斉メール' }] : [])].map((item) => {
           const active = isActivePath(pathname, item.href)
           return (
             <li key={item.href}>

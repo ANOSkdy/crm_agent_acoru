@@ -3,7 +3,7 @@ import { lineSchema, totals, type Invoice, type Settings } from './domain'
 
 export const ACORU_TEMPLATE = {
   name: 'Acoru帳票テンプレート',
-  version: '1.0.0',
+  version: '1.1.1',
   page: { width: 595.5, height: 842.25 },
   colors: {
     purple: [83 / 255, 68 / 255, 145 / 255],
@@ -20,7 +20,7 @@ const common = {
   subject: z.string().trim().max(100),
   issueDate: z.iso.date(),
   lines: z.array(lineSchema).min(1).max(100),
-  sample: z.boolean().default(true),
+  sample: z.boolean().default(false),
 }
 export const templateInputSchema = z
   .discriminatedUnion('kind', [

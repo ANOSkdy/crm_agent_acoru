@@ -26,6 +26,7 @@ export function InvoiceEditor({
   const subtotal = data.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0)
   const tax = Math.floor(subtotal / 10)
   const canDeliver =
+    live &&
     ['draft', 'simulated'].includes(invoice.status) &&
     !invoice.document.reviewNote &&
     !invoice.document.provisional &&
@@ -66,7 +67,7 @@ export function InvoiceEditor({
       )}
       {invoice.billing_enabled === false && (
         <p className="billing-banner">
-          この顧客の請求は無効です。送信・送信検証は停止しています。
+          この顧客の請求は無効です。送信は停止しています。
         </p>
       )}
       {invoice.document.imported && invoice.status === 'sent' && (
@@ -76,7 +77,7 @@ export function InvoiceEditor({
       )}
       {!live && (
         <p className="billing-banner">
-          検証モード：メールは外部に送信されません。
+          メール送信は停止中です。
         </p>
       )}
       {action.feedback}
@@ -143,7 +144,7 @@ export function InvoiceEditor({
                 <small>
                   {allowReal
                     ? 'この請求書に保存された宛先'
-                    : '検証用：@example.invalid のみ'}
+                    : '送付先の登録は停止中です'}
                 </small>
               </label>
               <label>
@@ -213,7 +214,7 @@ export function InvoiceEditor({
           </div>
           {dirty && (
             <p className="billing-notice">
-              変更を保存してから検証・送信してください。
+              変更を保存してから送信してください。
             </p>
           )}
           <button
@@ -221,7 +222,6 @@ export function InvoiceEditor({
             disabled={!canDeliver || action.busy}
             onClick={() => {
               if (
-                !live ||
                 window.confirm(
                   `${invoice.document.name}（${invoice.document.email}）へ ${yen(invoice.total)} の請求書を送信しますか？`,
                 )
@@ -231,14 +231,10 @@ export function InvoiceEditor({
           >
             {action.busy
               ? '処理中…'
-              : live
-                ? 'この請求書を送信'
-                : '送信内容を検証する'}
+              : 'この請求書を送信'}
           </button>
           <p className="billing-footnote">
-            {live
-              ? '送信後は内容と宛先を固定し、重複送信を防ぎます。'
-              : 'PDFと送付内容を記録します。外部メールサービスは呼び出しません。'}
+            送信後は内容と宛先を固定し、重複送信を防ぎます。
           </p>
         </aside>
       </div>

@@ -5,6 +5,7 @@ import {
   ACORU_TEMPLATE,
 } from '@/lib/billing/template'
 import { createBusinessDocumentPdf } from '@/lib/billing/pdf'
+import { invoicePdfDisposition } from '@/lib/billing/domain'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -26,7 +27,9 @@ export async function POST(request: Request) {
     return new Response(new Uint8Array(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="acoru_${input.kind}_${input.issueDate}.pdf"`,
+        'Content-Disposition': input.kind === 'invoice'
+          ? invoicePdfDisposition(input)
+          : `inline; filename="acoru_${input.kind}_${input.issueDate}.pdf"`,
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
         'X-Acoru-Template-Version': ACORU_TEMPLATE.version,

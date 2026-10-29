@@ -1,4 +1,8 @@
-import { PDFDocument, rgb, type PDFFont } from 'pdf-lib'
+import {
+  PDFDocument,
+  rgb,
+  type PDFFont,
+} from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -176,31 +180,46 @@ export async function createBusinessDocumentPdf(
     line(52, 703, 543.5)
 
     text(quotation ? 'お見積先' : 'ご請求先', 52, 690, 8, muted)
-    const recipient = wrap(`${d.name}　${d.honorific}`, font, 13, 268)
-    if (recipient.length > 3)
-      throw Error('請求先名が長いため、短く調整してください')
-    recipient.forEach((s, i) => text(s, 52, 668 - i * 18, 13))
-    const recipientEnd = 668 - (recipient.length - 1) * 18
-    line(52, recipientEnd - 10, 320, 1.4, purple)
-    text(d.issuer.name, 349, 675, fit(d.issuer.name, 18, 194.5), ink)
+    const recipientText = `${d.name}　${d.honorific}`.replace(/[\r\n\t]+/g, ' ')
+    const recipientSize = fit(recipientText, 19, 268)
+    if (recipientSize < 9)
+      throw Error('宛名を読みやすい大きさで1行に収めるため、顧客名を短く調整してください')
+    text(recipientText, 52, 668, recipientSize)
+    line(52, 658, 320, 1.4, purple)
+    if (font.widthOfTextAtSize(d.issuer.name, 14) > 194.5)
+      throw Error('請求元名が長いため、短く調整してください')
     const issuerAddress = wrap(d.issuer.address, font, 8.5, 194.5)
     if (issuerAddress.length > 4)
       throw Error('請求元住所が長いため、短く調整してください')
-    issuerAddress.forEach((s, i) => text(s, 349, 653 - i * 12, 8.5))
-    const issuerBottom = 653 - issuerAddress.length * 12
+    const issuerTop = !quotation && issuerAddress.length === 4 ? 687 : 675
+    text(d.issuer.name, 349, issuerTop, 14, ink)
+    issuerAddress.forEach((s, i) => text(s, 349, issuerTop - 22 - i * 12, 8.5))
+    const issuerBottom = issuerTop - 22 - issuerAddress.length * 12
     text('TEL', 349, issuerBottom - 4, 8.5)
     text(d.issuer.tel.normalize('NFKC'), 373, issuerBottom - 4, 8.5)
+    if (!quotation) {
+      // Separate the Latin prefix from the digits to retain Noto's searchable,
+      // evenly spaced ASCII glyphs without changing the rest of the document.
+      const prefix = d.issuer.registration.slice(0, 1)
+      text(prefix, 349, issuerBottom - 16, 8.5)
+      text(d.issuer.registration.slice(1), 349 + font.widthOfTextAtSize(prefix, 8.5), issuerBottom - 16, 8.5)
+    }
 
-    const subject = wrap(documentSubject(d), font, 11, 440)
+    const subjectText = documentSubject(d)
+    const subjectSize = 18
+    const subject = wrap(subjectText, font, subjectSize, 440)
     if (subject.length > 2) throw Error('件名が長いため、短く調整してください')
-    text('件名', 52, 572, 9, muted)
-    subject.forEach((s, i) => text(s, 84, 572 - i * 15, 11))
+    const subjectY = 578
+    text('件名', 52, subjectY, 9, muted)
+    subject.forEach((s, i) =>
+      text(s, 84, subjectY - i * 23, subjectSize),
+    )
     text(
       quotation
         ? '下記の通り、お見積申し上げます。'
         : '下記の通り、ご請求申し上げます。',
       52,
-      545,
+      539,
       9,
     )
 

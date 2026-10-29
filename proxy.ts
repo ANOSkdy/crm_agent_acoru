@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { localAuthEnabled } from './lib/auth/local-policy'
 
 const SESSION_COOKIE_NAME = 'acoru_session'
 
@@ -19,7 +20,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  if (!request.cookies.get(SESSION_COOKIE_NAME)?.value) {
+  const localSession = localAuthEnabled(process.env, request.headers.get('host')) && request.cookies.get('acoru_local_session')?.value
+  if (!request.cookies.get(SESSION_COOKIE_NAME)?.value && !localSession) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
     loginUrl.searchParams.set('next', pathname)

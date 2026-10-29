@@ -1,5 +1,6 @@
 import { billingUser, repository } from '@/lib/billing/server'
 import { createInvoicePdf } from '@/lib/billing/pdf'
+import { invoicePdfDisposition } from '@/lib/billing/domain'
 
 export const runtime = 'nodejs'
 export async function GET(
@@ -18,7 +19,7 @@ export async function GET(
     return new Response(new Uint8Array(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="invoice_${encodeURIComponent(id)}.pdf"`,
+        'Content-Disposition': invoicePdfDisposition(invoice.document),
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
       },

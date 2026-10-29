@@ -51,3 +51,8 @@ out
 dist
 *.log
 .local-test/
+/output/pdf/
+
+# Local RAW sync identity and acknowledgements
+.acoru-raw-sync.json
+.acoru-raw-sync.json.*

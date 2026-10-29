@@ -1,9 +1,12 @@
 import { formatDisplayDate } from '@/lib/utils/date'
 import { NextResponse } from 'next/server'
+import { requireApiUser } from '@/lib/auth/deal-permissions'
+import { apiError } from '@/lib/http/api'
 import { getCompanies } from '@/lib/db/queries/companies'
 
 export async function GET() {
   try {
+    await requireApiUser()
     const companies = await getCompanies()
 
     const headers = ['ID', '会社名', '法人番号', '業種', 'ウェブサイト', '郵便番号', '住所', '電話番号', 'ステータス', '流入元', 'メモ', '作成日']
@@ -34,7 +37,6 @@ export async function GET() {
       },
     })
   } catch (err) {
-    console.error('export companies error:', err)
-    return NextResponse.json({ error: 'エクスポートに失敗しました' }, { status: 500 })
+    return apiError(err)
   }
 }

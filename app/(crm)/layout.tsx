@@ -1,5 +1,6 @@
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { requireCurrentUser } from '@/lib/auth/session'
+import { isMailEnabled } from '@/lib/bulk-mail/domain'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export default async function CrmLayout({
         </div>
       </header>
       <div className="app-body">
-        <AppNavigation />
+        <AppNavigation localMail={user.role === 'admin' && isMailEnabled(process.env)} />
         <main className="app-content">{children}</main>
       </div>
     </div>

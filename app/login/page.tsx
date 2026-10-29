@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/session'
 import { OtpForm } from './verify/OtpForm'
 import { safeReturnTo } from '@/lib/auth/mfa-crypto'
+import { localAuthAvailable } from '@/lib/auth/local-session'
+import { LocalKeyForm } from './LocalKeyForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,8 +12,10 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string }>
 }) {
+  const returnTo = safeReturnTo((await searchParams).next)
   const user = await getCurrentUser()
-  if (user) redirect('/dashboard')
+  if (user) redirect(returnTo)
+  const localAuth = await localAuthAvailable()
 
   return (
     <main className="login-page" aria-labelledby="login-title">
@@ -25,10 +29,10 @@ export default async function LoginPage({
             Acoru CRM
           </h1>
           <p className="login-card__description">
-            1Passwordの認証コードを入力してください。
+            {localAuth ? 'ローカル試用用の固定キーを入力してください。' : '1Passwordの認証コードを入力してください。'}
           </p>
         </div>
-        <OtpForm returnTo={safeReturnTo((await searchParams).next)} />
+        {localAuth ? <LocalKeyForm returnTo={returnTo} /> : <OtpForm returnTo={returnTo} />}
       </section>
     </main>
   )

@@ -4,18 +4,20 @@ import { redirect } from 'next/navigation'
 import { createDeal, updateDeal, deleteDeal } from '@/lib/db/queries/deals'
 import { createDealSchema, updateDealSchema } from '@/lib/validation/deal'
 import { requireApiUser, requireDealAccess } from '@/lib/auth/deal-permissions'
-import { AgentError } from '@/lib/agent/errors'
+import { requireCrmRelations } from '@/lib/auth/crm-permissions'
+import { AppError } from '@/lib/http/errors'
 
 export async function createDealAction(formData: FormData): Promise<void> {
   const user = await requireApiUser()
-  if (user.role === 'viewer') throw new AgentError(403, '作成権限がありません')
+  if (user.role === 'viewer') throw new AppError(403, '作成権限がありません')
   const raw = Object.fromEntries(formData.entries())
   const parsed = createDealSchema.safeParse(raw)
   if (!parsed.success) {
     console.error('Validation error:', parsed.error.issues[0].message)
     return
   }
-  const deal = await createDeal({ ...parsed.data, owner_user_id: user.id })
+  await requireCrmRelations(parsed.data)
+  const deal = await createDeal({ ...parsed.data, owner_user_id: user.id, created_by: user.id })
   redirect(`/deals/${deal.id}`)
 }
 

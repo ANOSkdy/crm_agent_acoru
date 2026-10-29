@@ -8,6 +8,7 @@ import {
   touchSession,
 } from '@/lib/db/queries/sessions'
 import type { AppUser } from '@/lib/db/queries/users'
+import { localUser, revokeLocalSession } from './local-session'
 import {
   authEnvironment,
   encryptionKey,
@@ -50,6 +51,8 @@ function getExpiredCookieOptions() {
 }
 
 export async function getCurrentUser(): Promise<AppUser | null> {
+  const devUser = await localUser()
+  if (devUser) return devUser
   try {
     encryptionKey()
     otpUserId()
@@ -88,10 +91,12 @@ export async function setSessionCookie(token: string) {
 }
 
 export async function revokeCurrentSession() {
+  if (await revokeLocalSession()) return true
   const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
   if (token) {
     await revokeSessionByTokenHash(hashSessionToken(token))
   }
   cookieStore.set(SESSION_COOKIE_NAME, '', getExpiredCookieOptions())
+  return false
 }

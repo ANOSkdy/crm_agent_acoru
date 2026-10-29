@@ -54,14 +54,14 @@ export function BillingWorkspace(props: Props) {
           <p>毎月の請求作成から送付履歴まで、ひとつの場所で。</p>
         </div>
         <span className={`billing-mode ${props.live ? 'live' : ''}`}>
-          {props.live ? '本番送信モード' : '検証モード・外部送信なし'}
+          {props.live ? 'メール送信可能' : 'メール送信停止中'}
         </span>
       </div>
       {!props.live && (
         <div className="billing-banner">
           <strong>顧客へメールは送信されません。</strong>
           <span>
-            送付先はダミーアドレスで検証します。実アドレスの登録・本番送信は承認後に有効化します。
+            請求先の設定・請求書の作成と編集・PDFの確認を行えます。
           </span>
         </div>
       )}
@@ -116,7 +116,7 @@ export function BillingWorkspace(props: Props) {
               note={`${monthly.length}件の請求書`}
             />
             <Metric
-              label="送信待ち・検証済み"
+              label="送信待ち"
               value={`${pending.length}件`}
               note={yen(pending.reduce((s, i) => s + i.total, 0))}
             />
@@ -161,7 +161,7 @@ export function BillingWorkspace(props: Props) {
                   onChange={(e) => setStatus(e.target.value)}
                 >
                   <option value="all">すべての状態</option>
-                  {Object.entries(statusLabels).map(([k, v]) => (
+                  {Object.entries(statusLabels).filter(([key]) => key !== 'simulated').map(([k, v]) => (
                     <option key={k} value={k}>
                       {v}
                     </option>
@@ -272,7 +272,7 @@ export function BillingWorkspace(props: Props) {
                       <td>{String(d.recipient)}</td>
                       <td>
                         {d.mode === 'test'
-                          ? '検証のみ・未送信'
+                          ? '未送信'
                           : (statusLabels[d.status as Invoice['status']] ??
                             String(d.status))}
                       </td>
@@ -282,7 +282,7 @@ export function BillingWorkspace(props: Props) {
               </table>
               {props.deliveries.length === 0 && (
                 <div className="billing-empty">
-                  新システムでの送信・検証記録はまだありません。
+                  送信履歴はまだありません。
                 </div>
               )}
             </div>
@@ -346,7 +346,7 @@ const eventLabels: Record<string, string> = {
   invoice_updated: '請求更新',
   customer_saved: '顧客・契約更新',
   settings_saved: '設定更新',
-  send_simulated: '送信検証',
+  send_simulated: '未送信',
   send_started: '送信開始',
   sent: 'メール受付完了',
   uncertain: '送信結果要確認',
@@ -381,7 +381,7 @@ function SettingsForm({
             checked={data.automation}
             onChange={(e) => setData({ ...data, automation: e.target.checked })}
           />
-          毎月の自動処理を有効にする（{live ? '本番送信' : '検証記録のみ'}）
+          毎月の自動処理を有効にする（{live ? '作成・送信' : '作成のみ'}）
         </label>
         <div className="billing-form-grid">
           <label>
@@ -509,7 +509,7 @@ function SettingsForm({
         {action.feedback}
       </fieldset>
       <p className="billing-footnote">
-        本番送信の有効化は環境設定で管理します。この画面から検証モードを解除することはできません。
+        メール送信の有効化は環境設定で管理します。
       </p>
     </form>
   )

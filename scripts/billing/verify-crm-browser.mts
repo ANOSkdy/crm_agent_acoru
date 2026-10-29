@@ -84,7 +84,7 @@ try {
   await page.goto(`${base}/billing/${invoice.id}`)
   await expect(page.getByText(/仮作成した請求書です/)).toBeVisible()
   await expect(
-    page.getByRole('button', { name: '送信内容を検証する', exact: true }),
+    page.getByRole('button', { name: 'この請求書を送信', exact: true }),
   ).toBeDisabled()
   const pdf = await context.request.get(`${base}/api/billing/pdf/${invoice.id}`)
   expect(pdf.status()).toBe(200)
@@ -94,8 +94,8 @@ try {
   await page.getByRole('button', { name: '変更を保存', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('保存しました')
   await expect(
-    page.getByRole('button', { name: '送信内容を検証する', exact: true }),
-  ).toBeEnabled()
+    page.getByRole('button', { name: 'この請求書を送信', exact: true }),
+  ).toBeDisabled()
   ;[invoice] =
     await sql`SELECT * FROM billing.invoices WHERE customer_id=${customer}`
   expect(invoice.document.provisional).toBe(false)

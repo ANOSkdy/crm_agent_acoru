@@ -1,6 +1,7 @@
 import {
   assertLiveSend,
   emailContent,
+  invoiceFilename,
   japanClock,
   previousPeriod,
 } from './domain'
@@ -27,8 +28,8 @@ export async function deliver(
   if (!['draft', 'simulated'].includes(invoice.status))
     throw new Error('送信可能な状態ではありません')
   if (invoice.document.reviewNote) throw new Error('移行データの確認が必要です')
-  const mode = options.live ? 'live' : 'test'
-  if (options.live) assertLiveSend(invoice, true, options.apiKey)
+  if (!options.live) throw new Error('メール送信は停止中です')
+  assertLiveSend(invoice, true, options.apiKey)
   const pdf = await options.pdf(invoice)
   const content = emailContent(invoice)
   const payload = {
@@ -37,7 +38,7 @@ export async function deliver(
     ...content,
     attachments: [
       {
-        filename: `invoice_${invoice.id}.pdf`,
+        filename: invoiceFilename(invoice.document),
         content: pdf.toString('base64'),
       },
     ],
@@ -45,7 +46,7 @@ export async function deliver(
   // Store the PDF once; the envelope plus pdf_base64 is the immutable send payload.
   const deliveryId = await repo.claim(
     invoice,
-    mode,
+    'live',
     { from: payload.from, to: payload.to, ...content },
     pdf.toString('base64'),
     actor,
@@ -54,11 +55,6 @@ export async function deliver(
     return {
       status: 'skipped',
       message: 'すでに処理済み、または他の操作で更新されています',
-    }
-  if (!options.live)
-    return {
-      status: 'simulated',
-      message: '検証記録を作成しました。外部送信は行っていません',
     }
   // Once a request may have reached the provider we never automatically retry it.
   // The permanent unique live-delivery index also survives Resend's 24h key expiry.
@@ -103,15 +99,13 @@ export async function scheduledRun(
   if (creationDay && clock.hour >= settings.sendHour)
     result.created = (await repo.generate(clock.period, 'cron')).created
   // Only the previous billing month is eligible; historical pending invoices are never swept up.
-  if (sendingDay && clock.hour >= settings.sendHour) {
+  if (options.live && sendingDay && clock.hour >= settings.sendHour) {
     const queue = (await repo.invoices(previousPeriod(clock.period)))
       .filter(
         (i) =>
           i.billing_enabled !== false &&
           !i.document.provisional &&
-          (options.live
-            ? ['draft', 'simulated'].includes(i.status)
-            : i.status === 'draft'),
+          ['draft', 'simulated'].includes(i.status),
       )
     // Reserve time to record unfinished work before the function's 300s limit.
     const deadline = Date.now() + 240_000

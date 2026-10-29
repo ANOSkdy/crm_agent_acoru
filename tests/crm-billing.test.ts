@@ -5,7 +5,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { readFile } from 'node:fs/promises'
 import { BillingRepository } from '../lib/billing/repository'
 import { defaults, japanClock } from '../lib/billing/domain'
-import { deliver } from '../lib/billing/service'
+import { deliver, scheduledRun } from '../lib/billing/service'
 
 async function setup() {
   const db = new PGlite()
@@ -107,6 +107,118 @@ test('CRM toggle creates provisional invoice atomically, keeps dummy recipient, 
     await db.close()
   }
 })
+test('an explicit invoice recipient is preserved when a stored customer has no selected contact', async () => {
+  const { db, repo } = await setup()
+  try {
+    const productionRepo = new BillingRepository(repo.db, true)
+    const customer = (await productionRepo.customers())[0]
+    assert.equal(customer.email, '')
+    await productionRepo.saveCustomer({ ...customer, email: 'invoice@example.com', contactId: null, billingEnabled: false }, 0, 'test', true)
+    const saved = (await productionRepo.customers())[0]
+    assert.equal(saved.contactId, null)
+    assert.equal(saved.email, 'invoice@example.com')
+    const document = await productionRepo.document(saved, '2026-10', defaults)
+    assert.equal(document.email, 'invoice@example.com')
+    assert.equal((await productionRepo.invoices()).length, 0)
+  } finally { await db.close() }
+})
+
+test('confirmed activation and scheduled delivery use the explicit billing recipient even with a selected contact', async () => {
+  const { db, repo, contact } = await setup()
+  try {
+    const productionRepo = new BillingRepository(repo.db, true)
+    await productionRepo.saveSettings({ ...defaults, automation: true, issuer: {
+      ...defaults.issuer, bank: '振込先設定済み', registration: 'T1234567890123',
+    } }, 1, 'test')
+    const customer = (await productionRepo.customers())[0]
+    await productionRepo.saveCustomer({ ...customer, email: 'invoice@example.com', contactId: contact, billingEnabled: true, templateConfirmed: true }, 0, 'test', true)
+    const invoice = (await productionRepo.invoices())[0]
+    assert.equal(invoice.status, 'draft')
+    assert.equal(invoice.document.provisional, false)
+    assert.equal(invoice.document.email, 'invoice@example.com')
+    assert.equal((await productionRepo.generate(invoice.period, 'test')).created, 0)
+    const [year, month] = invoice.period.split('-').map(Number)
+    const sendingTime = new Date(Date.UTC(year, month, 1)) // following month, 09:00 JST
+    let sent = 0
+    const options = { live: true, apiKey: 'mock-key', pdf: async () => Buffer.from('pdf'), fetcher: (async (_url, init) => {
+      const payload = JSON.parse(String(init?.body))
+      assert.deepEqual(payload.to, ['invoice@example.com'])
+      sent++
+      return new Response(JSON.stringify({ id: 'mock-delivery' }), { status: 200 })
+    }) as typeof fetch }
+    assert.equal((await scheduledRun(productionRepo, options, sendingTime)).processed, 1)
+    assert.equal((await scheduledRun(productionRepo, options, sendingTime)).processed, 0)
+    assert.equal(sent, 1)
+    assert.equal((await productionRepo.invoice(invoice.id)).status, 'sent')
+    assert.equal((await productionRepo.deliveries(invoice.id))[0].recipient, 'invoice@example.com')
+  } finally { await db.close() }
+})
+
+test('monthly generation keeps the billing address when contact email changes or is removed', async () => {
+  const { db, repo, contact } = await setup()
+  try {
+    const productionRepo = new BillingRepository(repo.db, true)
+    const customer = (await productionRepo.customers())[0]
+    await productionRepo.saveCustomer({ ...customer, email: 'invoice@example.com', contactId: contact, billingEnabled: true, templateConfirmed: true }, 0, 'test', true)
+    const initial = (await productionRepo.invoices())[0]
+    const [year, month] = initial.period.split('-').map(Number)
+    const nextPeriod = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7)
+    const laterPeriod = new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 7)
+
+    await db.query('UPDATE contacts SET email=$1 WHERE id=$2', ['changed-contact@example.com', contact])
+    assert.equal((await productionRepo.generate(nextPeriod, 'cron')).created, 1)
+    assert.equal((await productionRepo.invoices(nextPeriod))[0].document.email, 'invoice@example.com')
+
+    await db.query('UPDATE contacts SET email=NULL WHERE id=$1', [contact])
+    const saved = (await productionRepo.customers())[0]
+    await productionRepo.saveCustomer({ ...saved, email: 'new-billing@example.com' }, saved.version, 'test', true)
+    assert.equal((await productionRepo.generate(laterPeriod, 'cron')).created, 1)
+    assert.equal((await productionRepo.invoices(laterPeriod))[0].document.email, 'new-billing@example.com')
+    assert.deepEqual(await productionRepo.invoice(initial.id), initial)
+    assert.equal((await productionRepo.invoices(nextPeriod))[0].document.email, 'invoice@example.com')
+  } finally { await db.close() }
+})
+
+test('confirming settings updates only the current untouched provisional invoice', async () => {
+  const { db, repo } = await setup()
+  try {
+    const customer = (await repo.customers())[0]
+    await repo.saveCustomer({ ...customer, billingEnabled: true }, 0, 'test')
+    const current = (await repo.invoices())[0]
+    await repo.generate('2025-01', 'test')
+    const old = (await repo.invoices('2025-01'))[0]
+    const saved = (await repo.customers())[0]
+    const result = await repo.saveCustomer({ ...saved, templateConfirmed: true, lines: [{name:'月次保守',quantity:1,unitPrice:70000}] }, saved.version, 'test')
+    assert.match(result!.message, /送信待ち/)
+    const confirmed = await repo.invoice(current.id)
+    assert.equal(confirmed.status, 'draft')
+    assert.equal(confirmed.document.provisional, false)
+    assert.equal(confirmed.total, 77000)
+    assert.equal(confirmed.version, 2)
+    assert.deepEqual(await repo.invoice(old.id), old)
+    const ready = (await repo.customers())[0]
+    await repo.saveCustomer({ ...ready, lines: [{name:'新しい月額',quantity:1,unitPrice:80000}] }, ready.version, 'test')
+    assert.deepEqual(await repo.invoice(current.id), confirmed)
+    assert.equal((await repo.invoices()).length, 2)
+  } finally { await db.close() }
+})
+
+test('saving confirmed settings never releases a manually held or edited invoice', async () => {
+  const { db, repo } = await setup()
+  try {
+    const customer = (await repo.customers())[0]
+    await repo.saveCustomer({ ...customer, billingEnabled: true }, 0, 'test')
+    const current = (await repo.invoices())[0]
+    await repo.updateInvoice(current.id, current.version, { ...current.document, subject: '個別調整' }, 'held', 'test')
+    const manuallyHeld = await repo.invoice(current.id)
+    const saved = (await repo.customers())[0]
+    await repo.saveCustomer({ ...saved, templateConfirmed: true }, saved.version, 'test')
+    assert.deepEqual(await repo.invoice(current.id), manuallyHeld)
+    await repo.generate('2028-08', 'test')
+    assert.equal((await repo.invoices('2028-08'))[0].status, 'draft')
+  } finally { await db.close() }
+})
+
 test('CRM changes affect future snapshots only; foreign contacts/deals and stale edits are rejected', async () => {
   const { db, repo, company } = await setup()
   try {

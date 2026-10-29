@@ -22,7 +22,7 @@ export function CrmBillingCustomers({
     <>
       <div className="billing-toolbar">
         <p>
-          CRMの顧客マスタと連動しています。有効化すると今月分を仮作成します。
+          内容を確認済みにして請求を有効化すると、今月分から送信待ちで作成します。
         </p>
         <Link className="btn" href="/companies">
           顧客マスタを開く →
@@ -154,7 +154,7 @@ function CrmBillingForm({
               }
             >
               <option value="disabled">無効</option>
-              <option value="enabled">有効（今月分を仮作成）</option>
+              <option value="enabled">有効（今月分から作成）</option>
             </select>
           </label>
           <label>
@@ -175,12 +175,12 @@ function CrmBillingForm({
             </select>
             <small>
               {allowReal
-                ? '選択した担当者のメールを今後の請求に反映します'
-                : '担当者を紐付けても、送付先は承認までダミーのままです'}
+                ? '今後作成する請求書の宛先には「送付先メールアドレス」を使用します'
+                : '送付先の登録は停止中です'}
             </small>
           </label>
           <label>
-            送付先メール（検証用）
+            送付先メールアドレス
             <input
               required
               type="email"
@@ -287,7 +287,10 @@ function CrmBillingForm({
           月次請求の内容を確認済み
         </label>
         <p className="billing-footnote">
-          未確認の設定から作る請求書は仮作成で停止します。既存の請求書の内容は上書きしません。
+          確認済みなら初回から送信待ちになります。自動処理・メール送信が有効な場合、毎月25日に作成し、翌月1日の9時（日本時間）に送信します。
+        </p>
+        <p className="billing-footnote">
+          未確認の場合は保留になります。後から確認済みにすると、今月の未編集の仮請求書だけを更新します。個別に編集・保留した請求書は変更しません。
         </p>
         <button className="btn btn--primary" type="submit">
           {action.busy ? '保存中…' : '請求設定を保存'}

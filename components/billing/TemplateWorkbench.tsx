@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { LinesEditor, yen } from './shared'
-import type { Line } from '@/lib/billing/domain'
+import { invoiceFilename, type Line } from '@/lib/billing/domain'
 import { ACORU_TEMPLATE } from '@/lib/billing/template'
 
 type Choice = {
@@ -33,7 +33,7 @@ export function TemplateWorkbench({
       .slice(0, 10),
     delivery: '',
     conditions: '',
-    sample: true,
+    sample: false,
     lines: [{ name: '', quantity: 1, unitPrice: 0, unit: '式' }] as Line[],
   })
   const [busy, setBusy] = useState(false)
@@ -89,7 +89,9 @@ export function TemplateWorkbench({
               setPreview({
                 url: URL.createObjectURL(await response.blob()),
                 input,
-                name: `${kind === 'quotation' ? '見積書' : '請求書'}_${data.issueDate}.pdf`,
+                name: kind === 'quotation'
+                  ? `見積書_${data.issueDate}.pdf`
+                  : invoiceFilename(data),
               })
             } catch (e) {
               setError(

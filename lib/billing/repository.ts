@@ -56,7 +56,7 @@ export class BillingRepository {
         ...(data ?? {
           id: `C${company.id}`,
           name: String(company.name),
-          email: `customer-${company.id}@example.invalid`,
+          email: this.allowRealRecipients ? '' : `customer-${company.id}@example.invalid`,
           honorific: '御中',
           status: '契約前',
           paymentTerm: '翌月末日',
@@ -83,9 +83,9 @@ export class BillingRepository {
         version: Number(row?.version ?? 0),
         billingEnabled: Boolean(row?.billing_enabled ?? false),
         templateConfirmed: Boolean(row?.template_confirmed ?? false),
-        contactId:
-          (row?.contact_id as string | null) ??
-          (choice?.contacts.length === 1 ? choice.contacts[0].id : null),
+        contactId: row
+          ? (row.contact_id as string | null)
+          : (choice?.contacts.length === 1 ? choice.contacts[0].id : null),
         sourceDealId:
           (row?.source_deal_id as string | null) ?? deal?.id ?? null,
         subject:
@@ -267,11 +267,20 @@ export class BillingRepository {
       WHERE id=$1 AND company_id=$3::uuid AND version=$8 AND $8>0 RETURNING id
     ), saved AS (SELECT id FROM changed UNION ALL SELECT id FROM updated), created AS (
       INSERT INTO billing.invoices(id,customer_id,company_id,period,document,status,subtotal,tax,total)
-      SELECT $9,id,$3::uuid,$10,$11::jsonb,'held',$12,$13,$14 FROM saved WHERE $4=true
+      SELECT $9,id,$3::uuid,$10,$11::jsonb,CASE WHEN $7 THEN 'draft' ELSE 'held' END,$12,$13,$14 FROM saved WHERE $4=true
       ON CONFLICT DO NOTHING RETURNING id
+    ), confirmed AS (
+      UPDATE billing.invoices SET document=$11::jsonb,status='draft',subtotal=$12,tax=$13,total=$14,version=version+1,updated_at=now()
+      WHERE id=$9 AND customer_id IN (SELECT id FROM saved) AND $4=true AND $7=true
+        AND period=$10 AND status='held' AND version=1 AND document->>'provisional'='true'
+        AND NOT (document ? 'reviewNote') AND NOT (document ? 'imported')
+        AND NOT EXISTS(SELECT 1 FROM billing.deliveries WHERE invoice_id=$9)
+      RETURNING id
+    ), confirmation_logged AS (
+      INSERT INTO billing.events(actor,action,target) SELECT $15,'invoice_confirmed',id FROM confirmed RETURNING id
     ), logged AS (
-      INSERT INTO billing.events(actor,action,target,detail) SELECT $15,'crm_billing_saved',id,jsonb_build_object('companyId',$3::text,'enabled',$4::boolean,'created',(SELECT count(*) FROM created)) FROM saved RETURNING id
-    ) SELECT (SELECT count(*) FROM created)::int AS created FROM logged`,
+      INSERT INTO billing.events(actor,action,target,detail) SELECT $15,'crm_billing_saved',id,jsonb_build_object('companyId',$3::text,'enabled',$4::boolean,'created',(SELECT count(*) FROM created),'confirmed',(SELECT count(*) FROM confirmation_logged)) FROM saved RETURNING id
+    ) SELECT (SELECT count(*) FROM created)::int AS created,(SELECT count(*) FROM confirmed)::int AS confirmed FROM logged`,
       [
         current.id,
         JSON.stringify(saved),
@@ -283,7 +292,7 @@ export class BillingRepository {
         version,
         invoiceId,
         period,
-        JSON.stringify({ ...document, provisional: true }),
+        JSON.stringify(document),
         amount.subtotal,
         amount.tax,
         amount.total,
@@ -296,8 +305,12 @@ export class BillingRepository {
       )
     return {
       message: Number(rows[0].created)
-        ? '請求を有効にし、今月の請求書を仮作成しました。内容を確認してください。'
-        : '請求設定を保存しました。作成済みの請求書は保持されています。',
+        ? saved.templateConfirmed
+          ? '請求を有効にし、今月の請求書を送信待ちで作成しました。自動処理・メール送信が有効なら翌月1日9時に送信します。'
+          : '請求を有効にし、今月の請求書を保留で作成しました。月次請求の内容を確認済みにすると送信待ちに進みます。'
+        : Number(rows[0].confirmed)
+          ? '請求設定を保存し、今月の未編集の仮請求書を確認済みの内容で送信待ちにしました。'
+          : '請求設定を保存しました。作成済みの請求書は保持されています。',
     }
   }
   async document(
@@ -305,16 +318,9 @@ export class BillingRepository {
     period: string,
     settings: Settings,
   ): Promise<Invoice['document']> {
-    let email = customer.email
-    if (this.allowRealRecipients && customer.companyId && customer.contactId) {
-      const [contact] = await this.db.query(
-        'SELECT email FROM contacts WHERE id=$1 AND company_id=$2 AND deleted_at IS NULL',
-        [customer.contactId, customer.companyId],
-      )
-      if (!contact?.email)
-        throw new Error('請求担当者のメールアドレスを設定してください')
-      email = String(contact.email)
-    }
+    // Snapshot the explicitly configured recipient; a linked CRM contact must
+    // never silently replace the address shown in billing settings.
+    const email = customer.email
     assertRecipient(email, this.allowRealRecipients)
     const enriched = customer as Customer
     // Keep the linked project's title in the document snapshot so later CRM
@@ -429,7 +435,7 @@ export class BillingRepository {
   }
   async claim(
     invoice: Invoice,
-    mode: 'test' | 'live',
+    mode: 'live',
     payload: object,
     pdf: string,
     actor: string,
@@ -454,13 +460,13 @@ export class BillingRepository {
         invoice.version,
         id,
         mode,
-        mode === 'live' ? 'sending' : 'simulated',
+        'sending',
         invoice.document.email,
         JSON.stringify(payload),
         pdf,
-        mode === 'live' ? 'sending' : 'simulated',
+        'sending',
         actor,
-        mode === 'live' ? 'send_started' : 'send_simulated',
+        'send_started',
       ],
     )
     return rows.length ? id : null

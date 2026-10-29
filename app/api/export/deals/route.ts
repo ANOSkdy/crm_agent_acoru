@@ -1,9 +1,12 @@
 import { formatDisplayDate } from '@/lib/utils/date'
 import { NextResponse } from 'next/server'
+import { requireApiUser } from '@/lib/auth/deal-permissions'
+import { apiError } from '@/lib/http/api'
 import { getDeals } from '@/lib/db/queries/deals'
 
 export async function GET() {
   try {
+    await requireApiUser()
     const deals = await getDeals()
 
     const headers = ['ID', '案件名', '会社名', '営業ステージ', '案件金額（円）', '受注確度（%）', '確度加重見込み金額（円）', '受注予定日', 'ステータス', '作成日']
@@ -36,7 +39,6 @@ export async function GET() {
       },
     })
   } catch (err) {
-    console.error('export deals error:', err)
-    return NextResponse.json({ error: 'エクスポートに失敗しました' }, { status: 500 })
+    return apiError(err)
   }
 }

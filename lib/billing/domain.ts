@@ -138,7 +138,7 @@ export function isDummy(email: string) {
 export function assertRecipient(email: string, allowReal = false) {
   z.email().parse(email)
   if (!allowReal && !isDummy(email))
-    throw new Error('承認前は example.invalid のダミーアドレスのみ登録できます')
+    throw new Error('送付先の登録は停止中です')
 }
 export function japanClock(now = new Date()) {
   const parts = Object.fromEntries(
@@ -172,6 +172,23 @@ export function emailContent(invoice: Invoice) {
     text: `${d.name} ${d.honorific}\n\nいつもお世話になっております。\n${d.issuer.name} 角谷です。\n\n${year}年${Number(month)}月分のご請求書をお送りいたします。\n添付ファイルをご確認くださいますようお願い申し上げます。\n\nご不明な点がございましたら、お気軽にお問い合わせください。\n今後とも何卒よろしくお願い申し上げます。\n\n---\n${d.issuer.name}\n${d.issuer.address}\n${d.issuer.tel}`,
   }
 }
+export function invoiceFilename(document: Pick<Invoice['document'], 'issueDate' | 'name'>) {
+  const customerName = document.name
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/\p{Cc}/gu, '_')
+    .trim()
+    .replace(/[. ]+$/g, '') || '顧客名未登録'
+  return `${document.issueDate.replaceAll('-', '')}_請求書（${customerName}）.pdf`
+}
+
+export function invoicePdfDisposition(document: Pick<Invoice['document'], 'issueDate' | 'name'>) {
+  const filename = invoiceFilename(document)
+  const encoded = encodeURIComponent(filename).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
+  return `inline; filename="${document.issueDate.replaceAll('-', '')}_invoice.pdf"; filename*=UTF-8''${encoded}`
+}
+
 export function documentSubject(document: Invoice['document']) {
   return (
     document.subject?.trim() ||
@@ -182,7 +199,7 @@ export function documentSubject(document: Invoice['document']) {
 }
 export const statusLabels: Record<Invoice['status'], string> = {
   draft: '送信待ち',
-  simulated: '検証済み',
+  simulated: '送信待ち',
   held: '保留',
   sending: '処理中・要確認',
   uncertain: '送信結果の確認待ち',

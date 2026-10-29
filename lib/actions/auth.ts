@@ -76,8 +76,8 @@ export async function verifyOtpAction(
 }
 export async function logoutAction() {
   const user = await getCurrentUser()
-  await revokeCurrentSession()
-  if (user)
+  const localSession = await revokeCurrentSession()
+  if (user && !localSession)
     await sql`INSERT INTO audit_logs(user_id,action,target_type) VALUES (${user.id},'logout','auth')`
   redirect('/login')
 }

@@ -60,7 +60,7 @@ try {
   await expect(
     page.getByRole('heading', { name: '請求管理', exact: true }),
   ).toBeVisible()
-  await expect(page.getByText('検証モード・外部送信なし')).toBeVisible()
+  await expect(page.getByText('メール送信停止中')).toBeVisible()
   const month = page.locator('input[type=month]')
   await month.fill(period)
   const total = monthly.reduce((sum, i) => sum + Number(i.total), 0)
@@ -92,12 +92,7 @@ try {
   expect(response.status()).toBe(200)
   expect(response.headers()['content-type']).toContain('application/pdf')
   await writeFile('.local-test/billing-migrated.pdf', await response.body())
-  await page
-    .getByRole('button', { name: '送信内容を検証する', exact: true })
-    .click()
-  await expect(page.getByText('検証済み', { exact: true })).toBeVisible({
-    timeout: 45000,
-  })
+  await expect(page.getByRole('button', { name: 'この請求書を送信', exact: true })).toBeDisabled()
   await page.goto(base + '/billing')
   await page.getByRole('button', { name: '顧客・請求設定', exact: true }).click()
   await expect(
@@ -107,7 +102,7 @@ try {
   await page.getByLabel(/送付先メール/).fill('unapproved@example.com')
   await page.getByRole('button', { name: '請求設定を保存', exact: true }).click()
   await expect(
-    page.getByRole('alert').filter({ hasText: 'ダミーアドレスのみ' }),
+    page.getByRole('alert').filter({ hasText: '送付先の登録は停止中です' }),
   ).toBeVisible()
   await page.getByRole('button', { name: '閉じる', exact: true }).click()
   await page.getByRole('button', { name: '設定', exact: true }).click()
@@ -118,8 +113,8 @@ try {
     .getByRole('button', { name: '送信・実行履歴', exact: true })
     .click()
   await expect(
-    page.getByText('検証のみ・未送信', { exact: true }).first(),
-  ).toBeVisible()
+    page.getByText('検証のみ・未送信', { exact: true }),
+  ).toHaveCount(0)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: '請求一覧', exact: true }).click()
   expect(
