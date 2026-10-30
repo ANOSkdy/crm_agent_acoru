@@ -45,6 +45,7 @@ export function CrmDataGrid<Row>({
   const [cellStatuses, setCellStatuses] = useState<Record<string, CellStatusState>>({})
   const [detailRow, setDetailRow] = useState<Row | null>(null)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inFlight = useRef(new Set<string>())
   const newRowRef = useRef<HTMLTableRowElement>(null)
 
   const dataColumns = useMemo(() => columns.filter((column) => column.key !== 'actions'), [columns])
@@ -130,9 +131,13 @@ export function CrmDataGrid<Row>({
     if (!row || !column || !isEditable(row, column)) return
     const key = statusKey(cell.rowId, cell.columnKey)
     if (String(column.getValue?.(row) ?? '') === String(cell.draftValue ?? '')) { setEditingCell(null); return }
+    // A dropdown saves on change and again on blur; send each value once.
+    const request = `${key}=${String(cell.draftValue ?? '')}`
+    if (inFlight.current.has(request)) return
+    inFlight.current.add(request)
     setCellStatuses((current) => ({ ...current, [key]: { status: 'saving' } }))
     const value = column.parseValue ? column.parseValue(cell.draftValue) : cell.draftValue
-    const result = await onSaveCell(row, column, value)
+    const result = await onSaveCell(row, column, value).finally(() => inFlight.current.delete(request))
     if (result.ok) {
       setLocalRows((current) => current.map((item) => getRowId(item) === cell.rowId ? result.row : item))
       setCellStatuses((current) => ({ ...current, [key]: { status: 'saved' } }))
@@ -231,8 +236,10 @@ export function CrmDataGrid<Row>({
     }
     const onBlur = () => void saveCell(editor)
     const update = (draftValue: unknown) => setEditingCell({ ...editor, draftValue })
-    if (column.editor === 'select') return <select aria-label={label} autoFocus className="crm-grid__editor-select" value={String(editor.draftValue ?? '')} onKeyDown={onKeyDown} onBlur={onBlur} onChange={(event) => update(event.target.value)}>{column.required ? null : <option value="">（なし）</option>}{column.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-    if (column.editor === 'checkbox') return <input aria-label={label} autoFocus className="crm-grid__editor-checkbox" type="checkbox" checked={editor.draftValue === true || editor.draftValue === 'true'} onKeyDown={onKeyDown} onBlur={onBlur} onChange={(event) => update(event.target.checked)} />
+    // Picking a choice is a complete edit, like Excel's dropdown cells.
+    const commitNow = (draftValue: unknown) => { const next = { ...editor, draftValue }; setEditingCell(next); void saveCell(next) }
+    if (column.editor === 'select') return <select aria-label={label} autoFocus className="crm-grid__editor-select" value={String(editor.draftValue ?? '')} onKeyDown={onKeyDown} onBlur={onBlur} onChange={(event) => commitNow(event.target.value)}>{column.required ? null : <option value="">（なし）</option>}{column.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+    if (column.editor === 'checkbox') return <input aria-label={label} autoFocus className="crm-grid__editor-checkbox" type="checkbox" checked={editor.draftValue === true || editor.draftValue === 'true'} onKeyDown={onKeyDown} onBlur={onBlur} onChange={(event) => commitNow(event.target.checked)} />
     if (column.editor === 'textarea') return <textarea aria-label={label} autoFocus rows={3} className="crm-grid__editor-input crm-grid__editor-textarea" value={String(editor.draftValue ?? '')} onKeyDown={onKeyDown} onBlur={onBlur} onChange={(event) => update(event.target.value)} />
     return <input aria-label={label} autoFocus className="crm-grid__editor-input" type={inputType(column)} value={String(editor.draftValue ?? '')} onKeyDown={onKeyDown} onBlur={onBlur} onChange={(event) => update(event.target.value)} />
   }

@@ -108,8 +108,8 @@ try {
   await page.getByLabel('完了条件を編集', { exact: true }).press('Enter')
   await expect(page.getByRole('cell', { name: /^見積を承認する/ })).toBeVisible()
   await row.getByRole('cell').nth(8).dblclick()
+  // Choosing from the dropdown must save on its own, without Enter or leaving the cell.
   await page.getByLabel('状態を編集', { exact: true }).selectOption('not_needed')
-  await page.getByLabel('状態を編集', { exact: true }).press('Enter')
   await expect(row.getByRole('cell').nth(8)).toHaveText(/^不要/)
   expect(page.url()).toBe(urlBeforeEdit)
   await expect(page.getByText('期限超過', { exact: true })).toHaveCount(0)
