@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { Company } from '@/lib/db/queries/companies'
 import type { Deal } from '@/lib/db/queries/deals'
 import { updateCompanyGridCellAction, updateDealGridCellAction, type GridActionResult } from '@/lib/actions/grid-updates'
@@ -30,14 +30,19 @@ function PropertySheet<Row>({ record, fields, canEdit, save }: {
   if (source !== record) { setSource(record); setRow(record) }
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(null)
   const [status, setStatus] = useState<{ key: string; state: 'saving' | 'saved' | 'error'; error?: string } | null>(null)
+  const inFlight = useRef<string | null>(null)
 
-  const commit = async () => {
-    if (!editing) return
-    const field = fields.find((f) => f.key === editing.key)
+  const commit = async (next = editing) => {
+    if (!next) return
+    const field = fields.find((f) => f.key === next.key)
     if (!field) return
-    if (String(field.getValue(row) ?? '') === editing.value) { setEditing(null); return }
+    if (String(field.getValue(row) ?? '') === next.value) { setEditing(null); return }
+    // A dropdown saves on change and again on blur; send each value once.
+    const request = `${next.key}=${next.value}`
+    if (inFlight.current === request) return
+    inFlight.current = request
     setStatus({ key: field.key, state: 'saving' })
-    const result = await save(field.key, editing.value)
+    const result = await save(field.key, next.value).finally(() => { if (inFlight.current === request) inFlight.current = null })
     if (result.ok) {
       setRow(result.data)
       setEditing(null)
@@ -59,7 +64,7 @@ function PropertySheet<Row>({ record, fields, canEdit, save }: {
       const label = `${field.label}を編集`
       const editable = canEdit && !field.readOnly
       const editor = !isEditing ? null : field.editor === 'select'
-        ? <select autoFocus aria-label={label} className="crm-grid__editor-select" value={editing.value} onChange={(e) => setEditing({ key: field.key, value: e.target.value })} onBlur={() => void commit()} onKeyDown={onKeyDown(field)}>{field.required ? null : <option value="">（なし）</option>}{field.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+        ? <select autoFocus aria-label={label} className="crm-grid__editor-select" value={editing.value} onChange={(e) => { const next = { key: field.key, value: e.target.value }; setEditing(next); void commit(next) }} onBlur={() => void commit()} onKeyDown={onKeyDown(field)}>{field.required ? null : <option value="">（なし）</option>}{field.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
         : field.editor === 'textarea'
           ? <textarea autoFocus aria-label={label} rows={4} className="crm-grid__editor-input crm-grid__editor-textarea" value={editing.value} onChange={(e) => setEditing({ key: field.key, value: e.target.value })} onBlur={() => void commit()} onKeyDown={onKeyDown(field)} />
           : <input autoFocus aria-label={label} className="crm-grid__editor-input" type={field.editor === 'currency' ? 'number' : field.editor ?? 'text'} value={editing.value} onChange={(e) => setEditing({ key: field.key, value: e.target.value })} onBlur={() => void commit()} onKeyDown={onKeyDown(field)} />
