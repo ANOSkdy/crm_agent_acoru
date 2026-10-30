@@ -2,24 +2,36 @@
 
 import Link from 'next/link'
 import type { Company } from '@/lib/db/queries/companies'
-import { updateCompanyGridCellAction } from '@/lib/actions/grid-updates'
+import { createCompanyGridRowAction, updateCompanyGridCellAction } from '@/lib/actions/grid-updates'
+import { deleteCompanyAction } from '@/lib/actions/companies'
 import { Badge, statusBadgeVariant } from '@/components/ui/Badge'
 import { CrmDataGrid } from './CrmDataGrid'
 import type { CrmDataGridProps, GridColumn } from './gridTypes'
-import { formatDateText } from './cellUtils'
+import { confirmDelete, formatDateText } from './cellUtils'
+
+const statusOptions = [{ value: 'active', label: 'アクティブ' }, { value: 'inactive', label: '非アクティブ' }]
 
 const columns: GridColumn<Company>[] = [
-  { key: 'name', label: '会社名', width: 220, sortable: true, editable: true, editor: 'text', getValue: (c) => c.name, renderCell: (c) => <Link href={`/companies/${c.id}`} className="crm-grid__link crm-grid__link--strong">{c.name}</Link> },
-  { key: 'industry', label: '業種', width: 160, sortable: true, editable: true, editor: 'text', getValue: (c) => c.industry },
-  { key: 'phone', label: '電話番号', width: 150, sortable: true, editable: true, editor: 'text', getValue: (c) => c.phone },
-  { key: 'status', label: 'ステータス', width: 130, sortable: true, editable: true, editor: 'select', options: [{ value: 'active', label: 'アクティブ' }, { value: 'inactive', label: '非アクティブ' }], getValue: (c) => c.status, renderCell: (c) => <Badge variant={statusBadgeVariant(c.status)}>{c.status === 'active' ? 'アクティブ' : '非アクティブ'}</Badge> },
-  { key: 'created_at', label: '作成日', width: 130, sortable: true, getValue: (c) => c.created_at, renderCell: (c) => formatDateText(c.created_at) },
+  { key: 'name', label: '会社名', width: 220, sortable: true, editable: true, required: true, editor: 'text', getValue: (c) => c.name, renderCell: (c) => <span className="crm-grid__strong">{c.name}</span> },
+  { key: 'status', label: 'ステータス', width: 120, sortable: true, editable: true, required: true, editor: 'select', options: statusOptions, defaultValue: () => 'active', getValue: (c) => c.status, renderCell: (c) => <Badge variant={statusBadgeVariant(c.status)}>{c.status === 'active' ? 'アクティブ' : '非アクティブ'}</Badge> },
+  { key: 'industry', label: '業種', width: 130, sortable: true, editable: true, editor: 'text', filter: 'select', getValue: (c) => c.industry },
+  { key: 'phone', label: '電話番号', width: 140, sortable: true, editable: true, editor: 'text', getValue: (c) => c.phone },
+  { key: 'postal_code', label: '郵便番号', width: 100, sortable: true, editable: true, editor: 'text', getValue: (c) => c.postal_code },
+  { key: 'address', label: '住所', width: 240, sortable: true, editable: true, editor: 'text', getValue: (c) => c.address },
+  { key: 'website_url', label: 'ウェブサイト', width: 200, sortable: true, editable: true, editor: 'url', getValue: (c) => c.website_url, renderCell: (c) => c.website_url ? <a href={c.website_url} target="_blank" rel="noopener noreferrer" className="crm-grid__link">{c.website_url}</a> : '-' },
+  { key: 'corporate_number', label: '法人番号', width: 140, sortable: true, editable: true, editor: 'text', getValue: (c) => c.corporate_number },
+  { key: 'source', label: '流入元', width: 120, sortable: true, editable: true, editor: 'text', filter: 'select', getValue: (c) => c.source },
+  { key: 'memo', label: 'メモ', width: 240, editable: true, editor: 'textarea', getValue: (c) => c.memo },
+  { key: 'created_at', label: '作成日', width: 110, sortable: true, filter: false, getValue: (c) => c.created_at, renderCell: (c) => formatDateText(c.created_at) },
+  { key: 'actions', label: '操作', width: 110, renderCell: (c) => <span className="crm-grid__actions"><Link href={`/companies/${c.id}`} className="crm-grid__action-link">詳細</Link><form action={deleteCompanyAction.bind(null, c.id)}><button type="submit" className="crm-grid__action-link crm-grid__action-link--danger" onClick={confirmDelete}>削除</button></form></span> },
 ]
 
 type ToolbarProps = Pick<CrmDataGridProps<Company>, 'actions' | 'initialQuery' | 'initialFilters'>
 
-export function CompaniesGrid({ companies, ...toolbar }: { companies: Company[] } & ToolbarProps) {
-  return <CrmDataGrid {...toolbar} title="顧客" ariaLabel="顧客一覧グリッド" columns={columns} emptyMessage="顧客が見つかりません" getRowId={(row) => row.id} rows={companies} getRowDetailTitle={(row) => row.name} onSaveCell={async (row, column, value) => { const result = await updateCompanyGridCellAction(row.id, column.key as never, value); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } }} renderRowDetail={(c) => <div className="detail-list"><Detail label="会社名" value={c.name} /><Detail label="業種" value={c.industry} /><Detail label="電話番号" value={c.phone} /><Detail label="ステータス" value={c.status === 'active' ? 'アクティブ' : '非アクティブ'} /><Detail label="作成日" value={formatDateText(c.created_at)} /><div className="modal-footer"><Link href={`/companies/${c.id}`} className="button button-secondary">詳細を開く</Link><Link href={`/companies/${c.id}/edit`} className="button button-primary">編集</Link></div></div>} />
+export function CompaniesGrid({ companies, canWrite = true, ...toolbar }: { companies: Company[]; canWrite?: boolean } & ToolbarProps) {
+  return <CrmDataGrid {...toolbar} title="顧客" ariaLabel="顧客一覧グリッド" columns={columns} emptyMessage="顧客が見つかりません" getRowId={(row) => row.id} rows={companies}
+    canEditRow={() => canWrite}
+    createLabel="新しい顧客"
+    onCreateRow={canWrite ? async (values) => { const result = await createCompanyGridRowAction(values); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } } : undefined}
+    onSaveCell={async (row, column, value) => { const result = await updateCompanyGridCellAction(row.id, column.key as never, value); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } }} />
 }
-
-function Detail({ label, value }: { label: string; value: string | null | undefined }) { return <div className="detail-list__row"><dt className="detail-list__label">{label}</dt><dd className="detail-list__value">{value || '-'}</dd></div> }

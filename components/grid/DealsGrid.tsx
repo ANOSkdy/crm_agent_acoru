@@ -3,29 +3,41 @@
 import Link from 'next/link'
 import type { Deal } from '@/lib/db/queries/deals'
 import { deleteDealAction } from '@/lib/actions/deals'
-import { updateDealGridCellAction } from '@/lib/actions/grid-updates'
+import { createDealGridRowAction, updateDealGridCellAction } from '@/lib/actions/grid-updates'
 import { Badge, stageBadgeVariant } from '@/components/ui/Badge'
 import { CrmDataGrid } from './CrmDataGrid'
-import type { CrmDataGridProps, GridColumn } from './gridTypes'
-import { formatCurrency, formatDateText } from './cellUtils'
+import type { CrmDataGridProps, GridColumn, GridSelectOption } from './gridTypes'
+import { confirmDelete, formatCurrency, formatDateText } from './cellUtils'
 
-const columns: GridColumn<Deal>[] = [
-  { key: 'title', label: '案件名', width: 220, sortable: true, editable: true, editor: 'text', getValue: (d) => d.title, renderCell: (d) => <Link href={`/deals/${d.id}`} className="crm-grid__link crm-grid__link--strong">{d.title}</Link> },
-  { key: 'company', label: '会社', width: 180, sortable: true, getValue: (d) => d.company_name, renderCell: (d) => <Link href={`/companies/${d.company_id}`} className="crm-grid__link">{d.company_name ?? '-'}</Link> },
-  { key: 'stage', label: '営業ステージ', width: 150, sortable: true, filter: 'select', getValue: (d) => d.stage_name, renderCell: (d) => <Badge variant={stageBadgeVariant(d.stage_name)}>{d.stage_name ?? '-'}</Badge> },
-  { key: 'amount', label: '案件金額（円）', width: 150, align: 'right', sortable: true, editable: true, editor: 'currency', aggregate: 'sum', formatAggregate: formatCurrency, getValue: (d) => Number(d.amount), renderCell: (d) => formatCurrency(d.amount) },
-  { key: 'probability', label: '受注確度（%）', width: 130, align: 'right', sortable: true, editable: true, editor: 'number', getValue: (d) => d.probability, renderCell: (d) => `${d.probability}%` },
-  { key: 'expected_close_date', label: '受注予定日', width: 130, sortable: true, editable: true, editor: 'date', getValue: (d) => d.expected_close_date, renderCell: (d) => formatDateText(d.expected_close_date) },
-  { key: 'status', label: '状態', width: 110, sortable: true, editable: true, editor: 'select', options: [{ value: 'open', label: '進行中' }, { value: 'won', label: '受注' }, { value: 'lost', label: '失注' }], getValue: (d) => d.status },
-  { key: 'actions', label: '操作', width: 120, renderCell: (d) => <span className="crm-grid__actions"><Link href={`/deals/${d.id}/edit`} className="crm-grid__action-link">編集</Link><form action={deleteDealAction.bind(null, d.id, undefined)}><button type="submit" className="crm-grid__action-link crm-grid__action-link--danger">削除</button></form></span> },
-]
+const statusOptions = [{ value: 'open', label: '進行中' }, { value: 'won', label: '受注' }, { value: 'lost', label: '失注' }]
+
+function buildColumns(companyOptions: GridSelectOption[], stageOptions: GridSelectOption[], fixedCompanyId?: string): GridColumn<Deal>[] {
+  return [
+    { key: 'title', label: '案件名', width: 220, sortable: true, editable: true, required: true, editor: 'text', getValue: (d) => d.title, renderCell: (d) => <span className="crm-grid__strong">{d.title}</span> },
+    ...(fixedCompanyId ? [] : [{ key: 'company_id', label: '会社', width: 180, sortable: true, creatable: true, required: true, editor: 'select', options: companyOptions, filter: 'text', getValue: (d) => d.company_name, renderCell: (d) => <Link href={`/companies/${d.company_id}`} className="crm-grid__link">{d.company_name ?? '-'}</Link> } satisfies GridColumn<Deal>]),
+    { key: 'stage_id', label: '営業ステージ', width: 140, sortable: true, editable: true, editor: 'select', options: stageOptions, getValue: (d) => d.stage_id, renderCell: (d) => <Badge variant={stageBadgeVariant(d.stage_name)}>{d.stage_name ?? '-'}</Badge> },
+    { key: 'amount', label: '案件金額（円）', width: 140, align: 'right', sortable: true, editable: true, editor: 'currency', aggregate: 'sum', formatAggregate: formatCurrency, getValue: (d) => Number(d.amount), renderCell: (d) => formatCurrency(d.amount) },
+    { key: 'probability', label: '受注確度（%）', width: 120, align: 'right', sortable: true, editable: true, editor: 'number', getValue: (d) => d.probability, renderCell: (d) => `${d.probability}%` },
+    { key: 'expected_close_date', label: '受注予定日', width: 130, sortable: true, editable: true, editor: 'date', getValue: (d) => d.expected_close_date?.slice(0, 10), renderCell: (d) => formatDateText(d.expected_close_date) },
+    { key: 'status', label: '状態', width: 100, sortable: true, editable: true, required: true, editor: 'select', options: statusOptions, defaultValue: () => 'open', getValue: (d) => d.status },
+    { key: 'memo', label: 'メモ', width: 220, editable: true, editor: 'textarea', getValue: (d) => d.memo },
+    { key: 'actions', label: '操作', width: 100, renderCell: (d) => <span className="crm-grid__actions"><Link href={`/deals/${d.id}`} className="crm-grid__action-link">詳細</Link><form action={deleteDealAction.bind(null, d.id, fixedCompanyId)}><button type="submit" className="crm-grid__action-link crm-grid__action-link--danger" onClick={confirmDelete}>削除</button></form></span> },
+  ]
+}
 
 type ToolbarProps = Pick<CrmDataGridProps<Deal>, 'actions' | 'initialFilters'>
 
 const weightedSummary = (rows: Deal[]) => <span title="案件金額 × 受注確度">確度加重見込み <strong>{formatCurrency(rows.reduce((sum, d) => sum + Math.round(Number(d.amount) * d.probability / 100), 0))}</strong></span>
 
-export function DealsGrid({ deals, ...toolbar }: { deals: Deal[] } & ToolbarProps) {
-  return <CrmDataGrid {...toolbar} title="案件" summary={weightedSummary} ariaLabel="案件一覧グリッド" columns={columns} emptyMessage="案件が見つかりません" getRowId={(row) => row.id} rows={deals} getRowDetailTitle={(row) => row.title} onSaveCell={async (row, column, value) => { const result = await updateDealGridCellAction(row.id, column.key as never, value); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } }} renderRowDetail={(d) => <div className="detail-list"><Detail label="案件名" value={d.title} /><Detail label="会社" value={d.company_name} /><Detail label="営業ステージ" value={d.stage_name} /><Detail label="状態" value={d.status} /><Detail label="案件金額" value={formatCurrency(d.amount)} /><Detail label="受注確度" value={`${d.probability}%`} /><Detail label="受注予定日" value={formatDateText(d.expected_close_date)} /><div className="modal-footer"><Link href={`/deals/${d.id}`} className="button button-secondary">詳細を開く</Link><Link href={`/deals/${d.id}/edit`} className="button button-primary">編集</Link></div></div>} />
+export function DealsGrid({ deals, companies = [], stages, fixedCompanyId, canWrite = true, ownerOnlyUserId, title = '案件', ...toolbar }: {
+  deals: Deal[]; companies?: { id: string; name: string }[]; stages: { id: string; name: string }[]; fixedCompanyId?: string; canWrite?: boolean
+  /** Members may only edit deals they own. */
+  ownerOnlyUserId?: string; title?: string
+} & ToolbarProps) {
+  const columns = buildColumns(companies.map((c) => ({ value: c.id, label: c.name })), stages.map((s) => ({ value: s.id, label: s.name })), fixedCompanyId)
+  return <CrmDataGrid {...toolbar} title={title} summary={weightedSummary} ariaLabel="案件一覧グリッド" columns={columns} emptyMessage="案件が見つかりません" getRowId={(row) => row.id} rows={deals}
+    canEditRow={(row) => canWrite && (!ownerOnlyUserId || row.owner_user_id === ownerOnlyUserId)}
+    createLabel="新しい案件"
+    onCreateRow={canWrite ? async (values) => { const result = await createDealGridRowAction(fixedCompanyId ? { ...values, company_id: fixedCompanyId } : values); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } } : undefined}
+    onSaveCell={async (row, column, value) => { const result = await updateDealGridCellAction(row.id, column.key as never, value); return result.ok ? { ok: true, row: result.data } : { ok: false, error: result.error } }} />
 }
-
-function Detail({ label, value }: { label: string; value: string | null | undefined }) { return <div className="detail-list__row"><dt className="detail-list__label">{label}</dt><dd className="detail-list__value">{value || '-'}</dd></div> }
