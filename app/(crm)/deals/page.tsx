@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { getDeals, getDealStages } from '@/lib/db/queries/deals'
+import { getCompanies } from '@/lib/db/queries/companies'
+import { requireApiUser } from '@/lib/auth/deal-permissions'
 import { DealsGrid } from '@/components/grid/DealsGrid'
 
 interface Props {
@@ -8,51 +10,19 @@ interface Props {
 }
 
 export default async function DealsPage({ searchParams }: Props) {
-  const params = await searchParams
-  const [deals, stages] = await Promise.all([
-    getDeals({ stageId: params.stageId, status: params.status }),
-    getDealStages(),
-  ])
-
-  const totalAmount = deals.reduce((sum, d) => sum + Number(d.amount), 0)
-  const weightedAmount = deals.reduce((sum, d) => sum + Math.round(Number(d.amount) * d.probability / 100), 0)
+  const [params, deals, stages, companies, user] = await Promise.all([searchParams, getDeals(), getDealStages(), getCompanies(), requireApiUser()])
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">案件一覧</h1>
-        <a
-          href="/api/export/deals"
-          className="inline-flex items-center px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50"
-        >
-          CSVエクスポート
-        </a>
-      </div>
-
-      {/* Filters */}
-      <form className="flex gap-3">
-        <select name="stageId" defaultValue={params.stageId ?? ''} className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">全ステージ</option>
-          {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select name="status" defaultValue={params.status ?? ''} className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">全ステータス</option>
-          <option value="open">進行中</option>
-          <option value="won">受注</option>
-          <option value="lost">失注</option>
-        </select>
-        <button type="submit" className="px-4 py-2 bg-gray-800 text-white text-sm rounded-md hover:bg-gray-900">絞り込み</button>
-      </form>
-
-      {/* Totals */}
-      <div className="flex flex-wrap gap-6 text-sm">
-        <div className="text-gray-600">案件件数: <strong>{deals.length}</strong><p className="text-xs text-gray-500">表示対象の案件数</p></div>
-        <div className="text-gray-600">案件金額合計（円）: <strong>¥{totalAmount.toLocaleString()}</strong><p className="text-xs text-gray-500">表示対象案件の金額を単純合計した金額</p></div>
-        <div className="text-gray-600">確度加重見込み金額（円）: <strong>¥{weightedAmount.toLocaleString()}</strong><p className="text-xs text-gray-500">確度加重見込み金額 = 案件金額 × 受注確度</p></div>
-      </div>
-
-      <DealsGrid deals={deals} />
-
+    <div className="workspace">
+      <DealsGrid
+        deals={deals}
+        companies={companies.map((c) => ({ id: c.id, name: c.name }))}
+        stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+        canWrite={user.role !== 'viewer'}
+        ownerOnlyUserId={user.role === 'admin' ? undefined : user.id}
+        initialFilters={{ ...(params.stageId ? { stage_id: params.stageId } : {}), ...(params.status ? { status: params.status } : {}) }}
+        actions={<a href="/api/export/deals" className="btn btn--sm">CSVエクスポート</a>}
+      />
     </div>
   )
 }

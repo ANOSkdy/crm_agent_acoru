@@ -199,16 +199,18 @@ export async function deleteDeal(id: string): Promise<void> {
   `
 }
 
-export async function updateDealGridFields(id: string, data: Partial<Pick<Deal, 'title' | 'amount' | 'probability' | 'expected_close_date' | 'status'>>): Promise<Deal | null> {
+export async function updateDealGridFields(id: string, data: Partial<Pick<Deal, 'title' | 'amount' | 'stage_id' | 'probability' | 'expected_close_date' | 'status' | 'memo'>>): Promise<Deal | null> {
   const before = await getDealById(id)
   if (!before) return null
   const rows = await sql`
     UPDATE deals SET
       title = ${Object.hasOwn(data, 'title') ? data.title : before.title},
       amount = ${Object.hasOwn(data, 'amount') ? data.amount : before.amount},
+      stage_id = ${Object.hasOwn(data, 'stage_id') ? data.stage_id : before.stage_id},
       probability = ${Object.hasOwn(data, 'probability') ? data.probability : before.probability},
       expected_close_date = ${Object.hasOwn(data, 'expected_close_date') ? data.expected_close_date : before.expected_close_date},
       status = ${Object.hasOwn(data, 'status') ? data.status : before.status},
+      memo = ${Object.hasOwn(data, 'memo') ? data.memo : before.memo},
       updated_at = now()
     WHERE id = ${id} AND deleted_at IS NULL
     RETURNING *

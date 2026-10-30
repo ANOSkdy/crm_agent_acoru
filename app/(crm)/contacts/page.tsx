@@ -1,16 +1,16 @@
 export const dynamic = 'force-dynamic'
 
 import { getContacts } from '@/lib/db/queries/contacts'
+import { getCompanies } from '@/lib/db/queries/companies'
+import { requireApiUser } from '@/lib/auth/deal-permissions'
 import { ContactsGrid } from '@/components/grid/ContactsGrid'
 
 export default async function ContactsPage() {
-  const contacts = await getContacts()
+  const [contacts, companies, user] = await Promise.all([getContacts(), getCompanies(), requireApiUser()])
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">担当者一覧</h1>
-      <ContactsGrid contacts={contacts} />
-
+    <div className="workspace">
+      <ContactsGrid contacts={contacts} companies={companies.map((c) => ({ id: c.id, name: c.name }))} canWrite={user.role !== 'viewer'} />
     </div>
   )
 }

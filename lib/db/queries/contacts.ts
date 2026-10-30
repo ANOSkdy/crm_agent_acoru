@@ -116,7 +116,7 @@ export async function deleteContact(id: string): Promise<void> {
   await sql`UPDATE contacts SET deleted_at = now() WHERE id = ${id}`
 }
 
-export async function updateContactGridFields(id: string, data: Partial<Pick<Contact, 'name' | 'department' | 'position' | 'email' | 'phone' | 'is_decision_maker'>>): Promise<Contact | null> {
+export async function updateContactGridFields(id: string, data: Partial<Pick<Contact, 'name' | 'department' | 'position' | 'email' | 'phone' | 'is_decision_maker' | 'memo'>>): Promise<Contact | null> {
   const before = await getContactById(id)
   if (!before) return null
   const rows = await sql`
@@ -127,6 +127,7 @@ export async function updateContactGridFields(id: string, data: Partial<Pick<Con
       email = ${Object.hasOwn(data, 'email') ? data.email : before.email},
       phone = ${Object.hasOwn(data, 'phone') ? data.phone : before.phone},
       is_decision_maker = ${Object.hasOwn(data, 'is_decision_maker') ? data.is_decision_maker : before.is_decision_maker},
+      memo = ${Object.hasOwn(data, 'memo') ? data.memo : before.memo},
       updated_at = now()
     WHERE id = ${id} AND deleted_at IS NULL
     RETURNING *

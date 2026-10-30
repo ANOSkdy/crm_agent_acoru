@@ -26,3 +26,8 @@ export function formatDateText(value: string | null | undefined): string {
 export function formatCurrency(value: number | string | null | undefined): string {
   return `¥${Number(value ?? 0).toLocaleString()}`
 }
+
+/** Asks before a delete form submits. */
+export function confirmDelete(event: { preventDefault: () => void }) {
+  if (!window.confirm('削除しますか？')) event.preventDefault()
+}

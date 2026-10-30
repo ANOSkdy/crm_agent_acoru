@@ -14,9 +14,6 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const editableIds = tasks.filter(t => t.deal_id
     ? deals.some(d => d.id === t.deal_id && canEditDeal(user, d))
     : user.role === 'admin' || (user.role === 'member' && t.assigned_to === user.id)).map(t => t.id)
-  return <div className="p-4 sm:p-6 space-y-5">
-    <h1 className="text-2xl font-bold text-gray-900">課題管理</h1>
-    <TaskWorkspace tabs={tabs} companies={companies.map(c => ({ id: c.id, name: c.name }))} tasks={tasks}
+  return <TaskWorkspace tabs={tabs} companies={companies.map(c => ({ id: c.id, name: c.name }))} tasks={tasks}
       selected={selected} requestedCompany={params.company} editableIds={editableIds} canWrite={user.role !== 'viewer'} today={toDateInputValue(new Date())} />
-  </div>
 }
