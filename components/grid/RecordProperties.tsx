@@ -7,6 +7,7 @@ import { updateCompanyGridCellAction, updateDealGridCellAction, type GridActionR
 import { Badge, stageBadgeVariant, statusBadgeVariant } from '@/components/ui/Badge'
 import type { GridEditorType, GridSelectOption } from './gridTypes'
 import { formatCurrency, formatDateText } from './cellUtils'
+import { CellSaveStatus } from './CellSaveStatus'
 
 type Field<Row> = {
   key: string
@@ -45,7 +46,8 @@ function PropertySheet<Row>({ record, fields, canEdit, save }: {
     const result = await save(field.key, next.value).finally(() => { if (inFlight.current === request) inFlight.current = null })
     if (result.ok) {
       setRow(result.data)
-      setEditing(null)
+      // The user may already be editing another field by the time a slow save returns.
+      setEditing((current) => current?.key === next.key ? null : current)
       setStatus({ key: field.key, state: 'saved' })
       window.setTimeout(() => setStatus((current) => current?.key === field.key && current.state === 'saved' ? null : current), 1400)
     } else {
@@ -76,8 +78,7 @@ function PropertySheet<Row>({ record, fields, canEdit, save }: {
           onClick={(event) => { if (!editable || isEditing || (event.target as HTMLElement).closest('a')) return; setStatus(null); setEditing({ key: field.key, value: String(field.getValue(row) ?? '') }) }}
           onKeyDown={(event) => { if (editable && !isEditing && (event.key === 'Enter' || event.key === 'F2')) { event.preventDefault(); setEditing({ key: field.key, value: String(field.getValue(row) ?? '') }) } }}>
           {editor ?? (field.render ? field.render(row) : (field.options?.find((o) => o.value === String(field.getValue(row)))?.label ?? field.getValue(row) ?? '-'))}
-          {fieldStatus?.state === 'saving' ? <span className="crm-grid__cell-status">保存中</span> : null}
-          {fieldStatus?.state === 'saved' ? <span className="crm-grid__cell-status">保存済み</span> : null}
+          {fieldStatus?.state === 'saving' || fieldStatus?.state === 'saved' ? <CellSaveStatus state={fieldStatus.state} /> : null}
           {fieldStatus?.state === 'error' ? <span className="crm-grid__cell-error" role="alert">⚠ {fieldStatus.error}</span> : null}
         </dd>
       </div>

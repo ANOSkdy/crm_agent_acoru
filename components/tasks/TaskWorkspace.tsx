@@ -3,6 +3,7 @@ import { useActionState, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { addTaskTabAction } from '@/lib/actions/tasks'
 import type { Task, TaskTab } from '@/lib/db/queries/tasks'
+import { SaveSpinner } from '@/components/grid/CellSaveStatus'
 import { TasksGrid } from '@/components/grid/TasksGrid'
 
 export function TaskWorkspace({ tabs, companies, tasks, selected, editableIds, canWrite, today, requestedCompany }: {
@@ -27,7 +28,7 @@ export function TaskWorkspace({ tabs, companies, tasks, selected, editableIds, c
         <select aria-label="追加する顧客" name="company_id" className="select" required defaultValue={suggested?.id ?? ''} key={search + tabs.length + requestedCompany}>
           <option value="">登録済み顧客を選択</option>{available.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button className="btn btn--sm" type="submit" disabled={pending || !available.length} title="契約の有無にかかわらず登録済み顧客を追加できます。">{pending ? '追加中…' : '顧客タブを追加'}</button>
+        <button className="btn btn--sm" type="submit" disabled={pending || !available.length} title="契約の有無にかかわらず登録済み顧客を追加できます。">{pending ? <><SaveSpinner />追加中</> : '顧客タブを追加'}</button>
       </form>}
       {(suggested || state.error) && <div className="workspace__notes">
         {suggested && <p>{suggested.name}の顧客タブを追加してください。</p>}
