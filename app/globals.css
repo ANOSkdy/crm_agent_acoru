@@ -756,8 +756,8 @@ textarea.input { height: auto; padding: 8px 10px; }
 }
 
 .crm-grid__cell--editing { padding: 2px; }
-.crm-grid__cell--saving { box-shadow: inset 0 -2px 0 var(--color-primary); }
-.crm-grid__cell--saved { box-shadow: inset 0 -2px 0 var(--color-success); }
+.crm-grid__cell--saving,
+.crm-grid__cell--saved { position: relative; }
 .crm-grid__cell--error { box-shadow: inset 0 0 0 2px var(--color-danger); }
 
 .crm-grid__editor { display: block; }
@@ -787,17 +787,56 @@ textarea.input { height: auto; padding: 8px 10px; }
 
 .crm-grid__editor-checkbox { width: 1.1rem; height: 1.1rem; }
 
-.crm-grid__cell-status,
+.save-spinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: save-spin 700ms linear infinite;
+}
+.crm-grid__add .save-spinner,
+.btn .save-spinner { margin-right: 5px; }
+
+.crm-grid__cell-status {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.crm-grid__cell--right .crm-grid__cell-status { right: auto; left: 7px; }
+.crm-grid__cell--wrap .crm-grid__cell-status { top: 7px; margin-top: 0; }
+.crm-grid__cell-status--saving {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  /* Fast saves go straight to the check mark without flashing a spinner. */
+  animation: save-status-in 120ms var(--ease-out) 150ms both;
+}
+.crm-grid__cell-status--saved {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  animation: save-status-in 160ms var(--ease-out) both;
+}
+.record-sheet__value .crm-grid__cell-status { top: 11px; right: 18px; margin-top: 0; }
+
+@keyframes save-spin { to { transform: rotate(360deg); } }
+@keyframes save-status-in { from { opacity: 0; transform: scale(0.7); } }
+
 .crm-grid__cell-error {
   display: block;
   margin-top: 0.2rem;
   font-size: 0.72rem;
   line-height: 1.2;
-}
-
-.crm-grid__cell-status { color: var(--color-success); }
-
-.crm-grid__cell-error {
   border-left: 3px solid var(--color-danger);
   padding-left: 0.35rem;
   background: var(--color-danger-soft);
@@ -951,7 +990,7 @@ textarea.input { height: auto; padding: 8px 10px; }
   white-space: nowrap;
 }
 .crm-grid__add:hover:not(:disabled) { background: var(--color-primary-hover); }
-.crm-grid__add:disabled { cursor: progress; opacity: 0.6; }
+.crm-grid__add:disabled { cursor: progress; opacity: 0.85; }
 .crm-grid__new-input {
   width: 100%;
   height: 24px;

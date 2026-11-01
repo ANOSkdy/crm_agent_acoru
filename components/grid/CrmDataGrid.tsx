@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'reac
 import { Modal } from '@/components/ui/Modal'
 import type { CrmDataGridProps, GridCellStatus, GridColumn, SortState } from './gridTypes'
 import { compareGridValues } from './cellUtils'
+import { CellSaveStatus, SaveSpinner } from './CellSaveStatus'
 
 type CellRef = { rowId: string; columnKey: string }
 type EditingCell = CellRef & { draftValue: unknown }
@@ -142,7 +143,8 @@ export function CrmDataGrid<Row>({
       setLocalRows((current) => current.map((item) => getRowId(item) === cell.rowId ? result.row : item))
       setCellStatuses((current) => ({ ...current, [key]: { status: 'saved' } }))
       window.setTimeout(() => setCellStatuses((current) => ({ ...current, [key]: { status: 'idle' } })), 1400)
-      setEditingCell(null)
+      // The user may already be editing another cell by the time a slow save returns.
+      setEditingCell((current) => current?.rowId === cell.rowId && current.columnKey === cell.columnKey ? null : current)
     } else {
       setCellStatuses((current) => ({ ...current, [key]: { status: 'error', error: result.error } }))
     }
@@ -305,7 +307,7 @@ export function CrmDataGrid<Row>({
           <tbody>
             {onCreateRow ? <>
               <tr ref={newRowRef} className="crm-grid__row crm-grid__row--new">
-                <td className="crm-grid__cell crm-grid__cell--new-action" colSpan={2}><button type="button" className="crm-grid__add" disabled={creating} onClick={() => void createRow()}>{creating ? '追加中…' : '＋ 追加'}</button></td>
+                <td className="crm-grid__cell crm-grid__cell--new-action" colSpan={2}><button type="button" className="crm-grid__add" disabled={creating} onClick={() => void createRow()}>{creating ? <><SaveSpinner />追加中</> : '＋ 追加'}</button></td>
                 {columns.map((column) => <td key={column.key} className={`crm-grid__cell crm-grid__cell--new crm-grid__cell--${column.align ?? 'left'}`}>{createColumns.includes(column) ? renderNewInput(column) : null}</td>)}
               </tr>
               {newError ? <tr><td colSpan={columnCount} className="crm-grid__new-error" role="alert">⚠ {newError}</td></tr> : null}
@@ -326,8 +328,7 @@ export function CrmDataGrid<Row>({
                     onClick={(event) => { event.stopPropagation(); setFocusedCell({ rowId, columnKey: column.key }) }}
                     onDoubleClick={(event) => { if ((event.target as HTMLElement).closest('a, button')) return; event.stopPropagation(); if (clickTimer.current) clearTimeout(clickTimer.current); startEditing(row, column) }}>
                     {isEditing ? <span className="crm-grid__editor">{renderEditor(column, editingCell)}</span> : (column.renderCell ? column.renderCell(row) : (column.options?.find((option) => option.value === String(column.getValue?.(row)))?.label ?? column.getValue?.(row) ?? '-'))}
-                    {cellStatus?.status === 'saving' ? <span className="crm-grid__cell-status">保存中</span> : null}
-                    {cellStatus?.status === 'saved' ? <span className="crm-grid__cell-status">保存済み</span> : null}
+                    {cellStatus?.status === 'saving' || cellStatus?.status === 'saved' ? <CellSaveStatus state={cellStatus.status} /> : null}
                     {cellStatus?.status === 'error' ? <span className="crm-grid__cell-error" role="alert">⚠ {cellStatus.error}</span> : null}
                   </td>
                 })}
