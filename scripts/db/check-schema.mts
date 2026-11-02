@@ -25,10 +25,18 @@ async function check() {
   }
 
   stage = 'issue-schema'
-  await sql.transaction([
+  const [, , statusConstraints] = await sql.transaction([
     sql`SELECT issue_number, opened_on, title, completion_criteria, due_date, progress, status FROM crm_live_tasks LIMIT 0`,
     sql`SELECT company_id, created_by, created_at FROM task_company_tabs LIMIT 0`,
+    sql`SELECT conname, convalidated FROM pg_constraint WHERE conrelid = 'tasks'::regclass
+      AND conname IN ('tasks_status_check', 'tasks_issue_status')`,
   ], { readOnly: true })
+  if (statusConstraints.some(row => row.conname === 'tasks_status_check') ||
+    !statusConstraints.some(row => row.conname === 'tasks_issue_status' && row.convalidated)) {
+    console.error('Task status constraints are outdated. Apply migration 014 before rebuilding.')
+    process.exitCode = 1
+    return
+  }
   console.log(`Database schema ready: ${files.length} migrations and issue-management views verified`)
 }
 
