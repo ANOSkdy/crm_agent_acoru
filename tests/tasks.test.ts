@@ -72,3 +72,28 @@ test('direct issue creation and customer tab actions fail closed without authent
     assert.ok((await addTaskTabAction({}, new FormData())).error)
   } finally { if (old === undefined) delete process.env.MFA_ENCRYPTION_KEY; else process.env.MFA_ENCRYPTION_KEY = old }
 })
+
+test('upgrading a legacy database permits all issue states while retaining the new status constraint', async () => {
+  const company = randomUUID(), task = randomUUID()
+  const db = await testDatabase(async db => {
+    // Production predates migrate.sql and retains this older constraint.
+    await db.query("ALTER TABLE tasks ADD CONSTRAINT tasks_status_check CHECK (status IN ('open','done','cancelled'))")
+    await db.query("INSERT INTO companies(id,name) VALUES($1,'既存顧客')", [company])
+    await db.query("INSERT INTO tasks(id,company_id,title,description) VALUES($1,$2,'既存課題','既存進捗')", [task, company])
+  })
+  try {
+    for (const status of Object.keys(taskStatusLabels)) {
+      await db.query('UPDATE tasks SET status=$1 WHERE id=$2', [status, task])
+      const updated = (await db.query<{ status: string }>('SELECT status FROM tasks WHERE id=$1', [task])).rows[0]
+      assert.equal(updated.status, status)
+      await db.query("INSERT INTO tasks(company_id,title,status) VALUES($1,'新規課題',$2)", [company, status])
+    }
+    for (const status of ['cancelled', 'invalid']) {
+      await assert.rejects(db.query('UPDATE tasks SET status=$1 WHERE id=$2', [status, task]), {
+        code: '23514', constraint: 'tasks_issue_status',
+      })
+    }
+    const original = (await db.query('SELECT title,progress,issue_number FROM tasks WHERE id=$1', [task])).rows[0]
+    assert.deepEqual(original, { title: '既存課題', progress: '既存進捗', issue_number: 1 })
+  } finally { await db.close() }
+})
